@@ -162,7 +162,7 @@ const NewTicket = () => {
                         <option>Hardware Issue</option>
                         <option>Software / Application</option>
                         <option>Network / Connectivity</option>
-                        <option>Access Request</option>
+                        <option>Item Request / Upgrade</option>
                         <option>Other</option>
                       </select>
                       <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-[#9eb7a8]">
