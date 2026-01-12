@@ -1,2 +1,2 @@
-// Context providers will be added here
-export {};
+// Context providers
+export { AuthProvider, useAuth } from './AuthContext';

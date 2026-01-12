@@ -1,17 +1,62 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
+import * as yup from 'yup';
+
+// Validation schema
+const loginSchema = yup.object().shape({
+  username: yup.string().trim().required('Username is required'),
+  password: yup.string().required('Password is required').min(3, 'Password must be at least 3 characters')
+});
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { login, isAuthenticated } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
     password: ''
   });
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  // Redirect if already logged in
+  if (isAuthenticated()) {
+    navigate('/', { replace: true });
+    return null;
+  }
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Add authentication logic here
-    console.log('Login attempt:', formData);
+    setError('');
+
+    // Validate form using yup
+    try {
+      await loginSchema.validate(formData, { abortEarly: false });
+    } catch (validationError) {
+      setError(validationError.errors[0]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await api.post('/auth/login', {
+        username: formData.username.trim(),
+        password: formData.password
+      });
+
+      if (response.success) {
+        login(response.data, response.token);
+        navigate('/', { replace: true });
+      } else {
+        setError(response.message || 'Login failed');
+      }
+    } catch (err) {
+      setError(err.message || 'Invalid username or password');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -19,6 +64,8 @@ const Login = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
+    // Clear error when user starts typing
+    if (error) setError('');
   };
 
   return (
@@ -108,11 +155,21 @@ const Login = () => {
 
             {/* Action Button */}
             <button
-              className="mt-4 w-full h-14 bg-primary hover:bg-[#2fc76b] active:scale-[0.98] text-background-dark text-lg font-bold rounded-xl shadow-[0_4px_14px_0_rgba(56,224,123,0.39)] hover:shadow-[0_6px_20px_rgba(56,224,123,0.23)] transition-all duration-200 flex items-center justify-center gap-2"
+              className="mt-4 w-full h-14 bg-primary hover:bg-[#2fc76b] active:scale-[0.98] text-background-dark text-lg font-bold rounded-xl shadow-[0_4px_14px_0_rgba(56,224,123,0.39)] hover:shadow-[0_6px_20px_rgba(56,224,123,0.23)] transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               type="submit"
+              disabled={loading}
             >
-              <span className="material-symbols-outlined">login</span>
-              <span>Login</span>
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-background-dark"></div>
+                  <span>Logging in...</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined">login</span>
+                  <span>Login</span>
+                </>
+              )}
             </button>
           </form>
 
