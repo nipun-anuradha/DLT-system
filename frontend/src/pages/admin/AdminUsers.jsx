@@ -1,98 +1,267 @@
-import { useState } from 'react';
-import AdminSidebar from '../../components/layout/AdminSidebar';
+import { useState, useEffect } from "react";
+import AdminSidebar from "../../components/layout/AdminSidebar";
+import { apiRequest } from "../../utils/api";
+import * as Yup from "yup";
+
+// Validation schema for user form
+const userValidationSchema = Yup.object().shape({
+  name: Yup.string()
+    .required("Full name is required")
+    .min(2, "Name must be at least 2 characters")
+    .max(100, "Name must not exceed 100 characters"),
+  emp_no: Yup.string()
+    .required("Employee number is required")
+    .max(45, "Employee number must not exceed 45 characters")
+    .nullable(),
+  username: Yup.string()
+    .required("Username is required")
+    .min(3, "Username must be at least 3 characters")
+    .max(100, "Username must not exceed 100 characters"),
+  password: Yup.string()
+    .required("Password is required")
+    .min(6, "Password must be at least 3 characters"),
+  confirmPassword: Yup.string()
+    .required("Please confirm your password")
+    .oneOf([Yup.ref("password")], "Passwords must match"),
+  mobile: Yup.string()
+    .required("Mobile number is required")
+    .matches(/^$|^\d{10}$/, "Mobile number must be exactly 10 digits")
+    .nullable(),
+  branch_id: Yup.number().nullable(),
+  department_id: Yup.number().nullable(),
+});
 
 const AdminUsers = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [selectAll, setSelectAll] = useState(false);
 
+  // Modal state
+  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [formSuccess, setFormSuccess] = useState("");
+
+  // Lookup data
+  const [branches, setBranches] = useState([]);
+  const [departments, setDepartments] = useState([]);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    name: "",
+    emp_no: "",
+    username: "",
+    password: "",
+    confirmPassword: "",
+    mobile: "",
+    branch_id: "",
+    department_id: "",
+  });
+
+  // Field-level errors
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  // Fetch branches and departments on mount
+  useEffect(() => {
+    const fetchLookupData = async () => {
+      try {
+        const [branchesRes, departmentsRes] = await Promise.all([
+          apiRequest("/admin/branches"),
+          apiRequest("/admin/departments"),
+        ]);
+        setBranches(branchesRes.data || []);
+        setDepartments(departmentsRes.data || []);
+      } catch (error) {
+        console.error("Failed to fetch lookup data:", error);
+      }
+    };
+    fetchLookupData();
+  }, []);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormError("");
+    // Clear field error when user starts typing
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: "" }));
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      emp_no: "",
+      username: "",
+      password: "",
+      confirmPassword: "",
+      mobile: "",
+      branch_id: "",
+      department_id: "",
+    });
+    setFormError("");
+    setFormSuccess("");
+    setFieldErrors({});
+  };
+
+  const handleOpenModal = () => {
+    resetForm();
+    setIsAddUserModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsAddUserModalOpen(false);
+    resetForm();
+  };
+
+  const handleSubmitUser = async (e) => {
+    e.preventDefault();
+    setFormError("");
+    setFormSuccess("");
+    setFieldErrors({});
+
+    try {
+      // Validate with Yup
+      await userValidationSchema.validate(formData, { abortEarly: false });
+    } catch (validationError) {
+      if (validationError instanceof Yup.ValidationError) {
+        const errors = {};
+        validationError.inner.forEach((err) => {
+          if (err.path && !errors[err.path]) {
+            errors[err.path] = err.message;
+          }
+        });
+        setFieldErrors(errors);
+        setFormError("Please fix the errors below");
+        return;
+      }
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const payload = {
+        name: formData.name,
+        username: formData.username,
+        password: formData.password,
+        emp_no: formData.emp_no || null,
+        mobile: formData.mobile || null,
+        branch_id: formData.branch_id ? parseInt(formData.branch_id) : null,
+        department_id: formData.department_id
+          ? parseInt(formData.department_id)
+          : null,
+      };
+
+      await apiRequest("/admin/users", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+
+      setFormSuccess(
+        "User created successfully! They can now login with their credentials."
+      );
+      setTimeout(() => {
+        handleCloseModal();
+        // TODO: Refresh users list
+      }, 2000);
+    } catch (error) {
+      setFormError(error.message || "Failed to create user");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const users = [
     {
       id: 1,
-      name: 'Liam Johnson',
-      email: 'liam.j@managesys.com',
-      employeeId: 'EMP-2049',
-      role: 'Administrator',
-      roleIcon: 'admin_panel_settings',
-      roleColor: 'purple',
-      status: 'Active',
-      statusColor: 'primary',
-      lastLogin: 'Oct 24, 2023 09:41 AM',
+      name: "Liam Johnson",
+      email: "liam.j@managesys.com",
+      employeeId: "EMP-2049",
+      role: "Administrator",
+      roleIcon: "admin_panel_settings",
+      roleColor: "purple",
+      status: "Active",
+      statusColor: "primary",
+      lastLogin: "Oct 24, 2023 09:41 AM",
       avatar:
-        'https://lh3.googleusercontent.com/aida-public/AB6AXuCkfhwYdca94H5WJBEBaShl9H1FG-oTZdOKmKlQDkR3U-SfOD46svi1FJ2qg4kQSPrdYNVupwSmaTdNRdnpREWiC344ULLji1JxZf5kf25j-jyxdZbPbMg1ADFiQErWLBoCTJB-qsO5LpDuqLROxF780FYfEDBhqLoO-N38M1BpHEjLSemBeS_Vw0A0H4qOLXlGuisg_yOk458ORUXPTPc_Sq2ZQLiA9kBvSoS7UoIFMX6CJsEMnQSlXrFK_OgcwRhNKZDeS0P75w8',
+        "https://lh3.googleusercontent.com/aida-public/AB6AXuCkfhwYdca94H5WJBEBaShl9H1FG-oTZdOKmKlQDkR3U-SfOD46svi1FJ2qg4kQSPrdYNVupwSmaTdNRdnpREWiC344ULLji1JxZf5kf25j-jyxdZbPbMg1ADFiQErWLBoCTJB-qsO5LpDuqLROxF780FYfEDBhqLoO-N38M1BpHEjLSemBeS_Vw0A0H4qOLXlGuisg_yOk458ORUXPTPc_Sq2ZQLiA9kBvSoS7UoIFMX6CJsEMnQSlXrFK_OgcwRhNKZDeS0P75w8",
     },
     {
       id: 2,
-      name: 'Olivia Smith',
-      email: 'o.smith@managesys.com',
-      employeeId: 'EMP-3912',
-      role: 'User',
-      roleIcon: 'person',
-      roleColor: 'blue',
-      status: 'Active',
-      statusColor: 'primary',
-      lastLogin: 'Oct 23, 2023 04:15 PM',
+      name: "Olivia Smith",
+      email: "o.smith@managesys.com",
+      employeeId: "EMP-3912",
+      role: "User",
+      roleIcon: "person",
+      roleColor: "blue",
+      status: "Active",
+      statusColor: "primary",
+      lastLogin: "Oct 23, 2023 04:15 PM",
       avatar:
-        'https://lh3.googleusercontent.com/aida-public/AB6AXuAXaB5St52SfWsCuhWOfk52JJqw4BR2pgAz-Tedoz0h8lQ4uQ2cCmp2rPNBtlghTyPiTGCUQwUj9KbpIvTn6o2u2B2WzpcI_vVeA8hW8wfV-RA1D1I17SimOeFjuHfvRChfvk5s12ktqUrGVxJmuK_YSqFMtRLbcKxtPYmsfGYi2TnvTpSlFJO8n8i6l4QhJdBVbTxOYNELfK0SFVRurDe0d45PLfNHfx2xEtiwnrlWLzzNsDw6GB5Nz07Fa3QW0WRCd6GNEMFhU0g',
+        "https://lh3.googleusercontent.com/aida-public/AB6AXuAXaB5St52SfWsCuhWOfk52JJqw4BR2pgAz-Tedoz0h8lQ4uQ2cCmp2rPNBtlghTyPiTGCUQwUj9KbpIvTn6o2u2B2WzpcI_vVeA8hW8wfV-RA1D1I17SimOeFjuHfvRChfvk5s12ktqUrGVxJmuK_YSqFMtRLbcKxtPYmsfGYi2TnvTpSlFJO8n8i6l4QhJdBVbTxOYNELfK0SFVRurDe0d45PLfNHfx2xEtiwnrlWLzzNsDw6GB5Nz07Fa3QW0WRCd6GNEMFhU0g",
     },
     {
       id: 3,
-      name: 'Ethan Scott',
-      email: 'ethan.s@managesys.com',
-      employeeId: 'EMP-1102',
-      role: 'Support Agent',
-      roleIcon: 'support_agent',
-      roleColor: 'orange',
-      status: 'Disabled',
-      statusColor: 'gray',
-      lastLogin: 'Sep 12, 2023 11:00 AM',
-      initials: 'ES',
+      name: "Ethan Scott",
+      email: "ethan.s@managesys.com",
+      employeeId: "EMP-1102",
+      role: "Support Agent",
+      roleIcon: "support_agent",
+      roleColor: "orange",
+      status: "Disabled",
+      statusColor: "gray",
+      lastLogin: "Sep 12, 2023 11:00 AM",
+      initials: "ES",
     },
     {
       id: 4,
-      name: 'Noah Williams',
-      email: 'n.williams@managesys.com',
-      employeeId: 'EMP-4401',
-      role: 'User',
-      roleIcon: 'person',
-      roleColor: 'blue',
-      status: 'Active',
-      statusColor: 'primary',
-      lastLogin: 'Oct 22, 2023 02:20 PM',
+      name: "Noah Williams",
+      email: "n.williams@managesys.com",
+      employeeId: "EMP-4401",
+      role: "User",
+      roleIcon: "person",
+      roleColor: "blue",
+      status: "Active",
+      statusColor: "primary",
+      lastLogin: "Oct 22, 2023 02:20 PM",
       avatar:
-        'https://lh3.googleusercontent.com/aida-public/AB6AXuDfzxm6EeukL5iXGqBrdPSeBueswU02q6GStWJ7m3PQyR6nG4j89Uc9-sDTmleaZ1nJA_I60qi7M0mCoFNlFBee8FXTCPk50MMnjlZKOpBiUrrsEJwnag8J-LUtmNjG4QCSER43I9HT0OLQF_jXF9VLICkWa-9pDLZJqi3wbG_LxvUxnjI0wnTjyMCbuELOYeTgX5ES9EpTvb4gfcjFmjwTU4LSG9i1B5Yjwmg4FiKFkZYRMoet3-lTGqVNL3PJkOBJ1cVkvhT99Bg',
+        "https://lh3.googleusercontent.com/aida-public/AB6AXuDfzxm6EeukL5iXGqBrdPSeBueswU02q6GStWJ7m3PQyR6nG4j89Uc9-sDTmleaZ1nJA_I60qi7M0mCoFNlFBee8FXTCPk50MMnjlZKOpBiUrrsEJwnag8J-LUtmNjG4QCSER43I9HT0OLQF_jXF9VLICkWa-9pDLZJqi3wbG_LxvUxnjI0wnTjyMCbuELOYeTgX5ES9EpTvb4gfcjFmjwTU4LSG9i1B5Yjwmg4FiKFkZYRMoet3-lTGqVNL3PJkOBJ1cVkvhT99Bg",
     },
     {
       id: 5,
-      name: 'Ava Martinez',
-      email: 'ava.m@managesys.com',
-      employeeId: 'EMP-5122',
-      role: 'User',
-      roleIcon: 'person',
-      roleColor: 'blue',
-      status: 'Pending',
-      statusColor: 'yellow',
-      lastLogin: 'Never',
-      initials: 'AV',
+      name: "Ava Martinez",
+      email: "ava.m@managesys.com",
+      employeeId: "EMP-5122",
+      role: "User",
+      roleIcon: "person",
+      roleColor: "blue",
+      status: "Pending",
+      statusColor: "yellow",
+      lastLogin: "Never",
+      initials: "AV",
     },
   ];
 
   const getStatusBadge = (status, statusColor) => {
     const colors = {
-      primary: 'bg-primary/10 text-primary border-primary/20',
-      gray: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
-      yellow: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+      primary: "bg-primary/10 text-primary border-primary/20",
+      gray: "bg-gray-500/10 text-gray-400 border-gray-500/20",
+      yellow: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
     };
 
     const dotColors = {
-      primary: 'bg-primary',
-      gray: 'bg-gray-400',
-      yellow: 'bg-yellow-400',
+      primary: "bg-primary",
+      gray: "bg-gray-400",
+      yellow: "bg-yellow-400",
     };
 
     return (
-      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${colors[statusColor]}`}>
-        <span className={`size-1.5 rounded-full ${dotColors[statusColor]}`}></span>
+      <span
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${colors[statusColor]}`}
+      >
+        <span
+          className={`size-1.5 rounded-full ${dotColors[statusColor]}`}
+        ></span>
         {status}
       </span>
     );
@@ -100,11 +269,11 @@ const AdminUsers = () => {
 
   const getRoleIconColor = (color) => {
     const colors = {
-      purple: 'text-purple-400',
-      blue: 'text-blue-400',
-      orange: 'text-orange-400',
+      purple: "text-purple-400",
+      blue: "text-blue-400",
+      orange: "text-orange-400",
     };
-    return colors[color] || 'text-blue-400';
+    return colors[color] || "text-blue-400";
   };
 
   const handleSelectAll = (e) => {
@@ -132,13 +301,16 @@ const AdminUsers = () => {
 
   return (
     <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display h-screen flex overflow-hidden">
-      <AdminSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <AdminSidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+      />
 
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Header */}
         <header className="h-16 flex items-center justify-between border-b border-[#28392f] px-6 lg:px-10 bg-background-dark/95 backdrop-blur-sm z-10 sticky top-0">
           <div className="flex items-center gap-4 md:hidden">
-            <button 
+            <button
               className="text-white p-1 hover:bg-[#28392f] rounded-lg transition-colors"
               onClick={() => setIsSidebarOpen(true)}
             >
@@ -150,7 +322,9 @@ const AdminUsers = () => {
           {/* Search (Desktop) */}
           <div className="hidden md:flex w-full max-w-md items-center">
             <label className="flex w-full cursor-text items-center rounded-xl bg-[#1d2d25] border border-transparent focus-within:border-primary/50 transition-colors h-10 px-3">
-              <span className="material-symbols-outlined text-[#9cbaa8]">search</span>
+              <span className="material-symbols-outlined text-[#9cbaa8]">
+                search
+              </span>
               <input
                 className="w-full bg-transparent px-3 text-sm text-white placeholder-[#9cbaa8] focus:outline-none"
                 placeholder="Global Search..."
@@ -169,7 +343,9 @@ const AdminUsers = () => {
                 <p className="text-xs text-[#9cbaa8]">Super Admin</p>
               </div>
               <div className="relative size-10 rounded-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center border-2 border-[#28392f] shadow-lg">
-                <span className="material-symbols-outlined text-white text-xl">person</span>
+                <span className="material-symbols-outlined text-white text-xl">
+                  person
+                </span>
               </div>
             </div>
           </div>
@@ -180,12 +356,20 @@ const AdminUsers = () => {
           <div className="mx-auto max-w-7xl flex flex-col gap-6">
             {/* Breadcrumbs */}
             <div className="flex items-center gap-2 text-sm">
-              <a className="text-[#9cbaa8] hover:text-primary transition-colors flex items-center gap-1" href="#">
-                <span className="material-symbols-outlined text-[18px]">home</span>
+              <a
+                className="text-[#9cbaa8] hover:text-primary transition-colors flex items-center gap-1"
+                href="#"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  home
+                </span>
                 Home
               </a>
               <span className="text-[#9cbaa8]">/</span>
-              <a className="text-[#9cbaa8] hover:text-primary transition-colors" href="#">
+              <a
+                className="text-[#9cbaa8] hover:text-primary transition-colors"
+                href="#"
+              >
                 Admin
               </a>
               <span className="text-[#9cbaa8]">/</span>
@@ -195,10 +379,17 @@ const AdminUsers = () => {
             {/* Page Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">System Users</h1>
-                <p className="text-[#9cbaa8] mt-2">Manage user access, roles, and account statuses.</p>
+                <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
+                  System Users
+                </h1>
+                <p className="text-[#9cbaa8] mt-2">
+                  Manage user access, roles, and account statuses.
+                </p>
               </div>
-              <button className="flex items-center gap-2 rounded-xl bg-primary hover:bg-[#32d473] text-[#102217] px-5 py-3 font-bold transition-all shadow-[0_0_15px_rgba(61,245,135,0.2)] hover:shadow-[0_0_20px_rgba(61,245,135,0.4)]">
+              <button
+                onClick={handleOpenModal}
+                className="flex items-center gap-2 rounded-xl bg-primary hover:bg-[#32d473] text-[#102217] px-5 py-3 font-bold transition-all shadow-[0_0_15px_rgba(61,245,135,0.2)] hover:shadow-[0_0_20px_rgba(61,245,135,0.4)]"
+              >
                 <span className="material-symbols-outlined">add</span>
                 <span>Add New User</span>
               </button>
@@ -209,7 +400,9 @@ const AdminUsers = () => {
               {/* Search */}
               <div className="md:col-span-5 lg:col-span-6">
                 <label className="flex h-12 w-full items-center rounded-xl bg-surface-dark border border-[#28392f] focus-within:border-primary/50 focus-within:ring-1 focus-within:ring-primary/50 transition-all px-4 shadow-sm">
-                  <span className="material-symbols-outlined text-[#9cbaa8] mr-3">search</span>
+                  <span className="material-symbols-outlined text-[#9cbaa8] mr-3">
+                    search
+                  </span>
                   <input
                     className="flex-1 bg-transparent text-white placeholder-[#5a7063] focus:outline-none text-base"
                     placeholder="Search by Name, ID or Email"
@@ -234,22 +427,31 @@ const AdminUsers = () => {
                       </th>
                       <th className="p-4 border-b border-[#28392f] cursor-pointer hover:text-white transition-colors group">
                         <div className="flex items-center gap-1">
-                          User Details{' '}
+                          User Details{" "}
                           <span className="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-100">
                             arrow_drop_down
                           </span>
                         </div>
                       </th>
-                      <th className="p-4 border-b border-[#28392f]">Employee ID</th>
+                      <th className="p-4 border-b border-[#28392f]">
+                        Employee ID
+                      </th>
                       <th className="p-4 border-b border-[#28392f]">Role</th>
                       <th className="p-4 border-b border-[#28392f]">Status</th>
-                      <th className="p-4 border-b border-[#28392f]">Last Login</th>
-                      <th className="p-4 border-b border-[#28392f] text-right">Actions</th>
+                      <th className="p-4 border-b border-[#28392f]">
+                        Last Login
+                      </th>
+                      <th className="p-4 border-b border-[#28392f] text-right">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="text-sm divide-y divide-[#28392f]">
                     {users.map((user) => (
-                      <tr key={user.id} className="hover:bg-[#1d3326] transition-colors group">
+                      <tr
+                        key={user.id}
+                        className="hover:bg-[#1d3326] transition-colors group"
+                      >
                         <td className="p-4">
                           <input
                             className="rounded border-gray-600 bg-[#28392f] text-primary focus:ring-0 focus:ring-offset-0"
@@ -263,32 +465,56 @@ const AdminUsers = () => {
                             {user.avatar ? (
                               <div
                                 className="bg-center bg-no-repeat bg-cover rounded-full size-9"
-                                style={{ backgroundImage: `url('${user.avatar}')` }}
+                                style={{
+                                  backgroundImage: `url('${user.avatar}')`,
+                                }}
                               ></div>
                             ) : (
                               <div
-                                className={`flex items-center justify-center bg-${user.initials === 'ES' ? 'blue' : 'purple'}-500/20 text-${user.initials === 'ES' ? 'blue' : 'purple'}-400 rounded-full size-9 font-bold text-sm`}
+                                className={`flex items-center justify-center bg-${
+                                  user.initials === "ES" ? "blue" : "purple"
+                                }-500/20 text-${
+                                  user.initials === "ES" ? "blue" : "purple"
+                                }-400 rounded-full size-9 font-bold text-sm`}
                               >
                                 {user.initials}
                               </div>
                             )}
                             <div className="flex flex-col">
-                              <span className="text-white font-medium">{user.name}</span>
-                              <span className="text-[#9cbaa8] text-xs">{user.email}</span>
+                              <span className="text-white font-medium">
+                                {user.name}
+                              </span>
+                              <span className="text-[#9cbaa8] text-xs">
+                                {user.email}
+                              </span>
                             </div>
                           </div>
                         </td>
-                        <td className="p-4 text-white font-mono text-xs">{user.employeeId}</td>
+                        <td className="p-4 text-white font-mono text-xs">
+                          {user.employeeId}
+                        </td>
                         <td className="p-4 text-white">
                           <div className="flex items-center gap-2">
-                            <span className={`material-symbols-outlined text-[18px] ${getRoleIconColor(user.roleColor)}`}>
+                            <span
+                              className={`material-symbols-outlined text-[18px] ${getRoleIconColor(
+                                user.roleColor
+                              )}`}
+                            >
                               {user.roleIcon}
                             </span>
                             <span>{user.role}</span>
                           </div>
                         </td>
-                        <td className="p-4">{getStatusBadge(user.status, user.statusColor)}</td>
-                        <td className={`p-4 ${user.lastLogin === 'Never' ? 'text-[#9cbaa8] italic text-xs' : 'text-[#9cbaa8]'}`}>
+                        <td className="p-4">
+                          {getStatusBadge(user.status, user.statusColor)}
+                        </td>
+                        <td
+                          className={`p-4 ${
+                            user.lastLogin === "Never"
+                              ? "text-[#9cbaa8] italic text-xs"
+                              : "text-[#9cbaa8]"
+                          }`}
+                        >
                           {user.lastLogin}
                         </td>
                         <td className="p-4 text-right">
@@ -297,28 +523,36 @@ const AdminUsers = () => {
                               className="p-2 text-[#9cbaa8] hover:text-white hover:bg-[#28392f] rounded-lg transition-colors"
                               title="View Details"
                             >
-                              <span className="material-symbols-outlined text-[20px]">visibility</span>
+                              <span className="material-symbols-outlined text-[20px]">
+                                visibility
+                              </span>
                             </button>
-                            {user.status === 'Disabled' ? (
+                            {user.status === "Disabled" ? (
                               <button
                                 className="p-2 text-[#9cbaa8] hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                                 title="Enable User"
                               >
-                                <span className="material-symbols-outlined text-[20px]">check_circle</span>
+                                <span className="material-symbols-outlined text-[20px]">
+                                  check_circle
+                                </span>
                               </button>
-                            ) : user.status === 'Pending' ? (
+                            ) : user.status === "Pending" ? (
                               <button
                                 className="p-2 text-[#9cbaa8] hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
                                 title="Resend Invite"
                               >
-                                <span className="material-symbols-outlined text-[20px]">send</span>
+                                <span className="material-symbols-outlined text-[20px]">
+                                  send
+                                </span>
                               </button>
                             ) : (
                               <button
                                 className="p-2 text-[#9cbaa8] hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
                                 title="Disable User"
                               >
-                                <span className="material-symbols-outlined text-[20px]">block</span>
+                                <span className="material-symbols-outlined text-[20px]">
+                                  block
+                                </span>
                               </button>
                             )}
                           </div>
@@ -334,19 +568,24 @@ const AdminUsers = () => {
                 <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm text-[#9cbaa8]">
-                      Showing <span className="font-medium text-white">1</span> to{' '}
-                      <span className="font-medium text-white">5</span> of{' '}
+                      Showing <span className="font-medium text-white">1</span>{" "}
+                      to <span className="font-medium text-white">5</span> of{" "}
                       <span className="font-medium text-white">42</span> results
                     </p>
                   </div>
                   <div>
-                    <nav aria-label="Pagination" className="isolate inline-flex -space-x-px rounded-md shadow-sm">
+                    <nav
+                      aria-label="Pagination"
+                      className="isolate inline-flex -space-x-px rounded-md shadow-sm"
+                    >
                       <a
                         className="relative inline-flex items-center rounded-l-lg px-2 py-2 text-[#9cbaa8] ring-1 ring-inset ring-[#28392f] hover:bg-[#28392f] hover:text-white focus:z-20 focus:outline-offset-0"
                         href="#"
                       >
                         <span className="sr-only">Previous</span>
-                        <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+                        <span className="material-symbols-outlined text-[20px]">
+                          chevron_left
+                        </span>
                       </a>
                       <a
                         aria-current="page"
@@ -381,7 +620,9 @@ const AdminUsers = () => {
                         href="#"
                       >
                         <span className="sr-only">Next</span>
-                        <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+                        <span className="material-symbols-outlined text-[20px]">
+                          chevron_right
+                        </span>
                       </a>
                     </nav>
                   </div>
@@ -407,6 +648,301 @@ const AdminUsers = () => {
           </div>
         </main>
       </div>
+
+      {/* Add User Modal */}
+      {isAddUserModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={handleCloseModal}
+          ></div>
+
+          {/* Modal Content */}
+          <div className="relative bg-surface-dark border border-[#28392f] rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-[#28392f]">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center size-10 rounded-xl bg-primary/10">
+                  <span className="material-symbols-outlined text-primary">
+                    person_add
+                  </span>
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Add New User</h2>
+                  <p className="text-sm text-[#9cbaa8]">
+                    Create a new user account
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleCloseModal}
+                className="p-2 text-[#9cbaa8] hover:text-white hover:bg-[#28392f] rounded-lg transition-colors"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <form
+              onSubmit={handleSubmitUser}
+              className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]"
+            >
+              {/* Error Message */}
+              {formError && (
+                <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-red-400 text-[20px]">
+                    error
+                  </span>
+                  <span className="text-red-400 text-sm">{formError}</span>
+                </div>
+              )}
+
+              {/* Success Message */}
+              {formSuccess && (
+                <div className="mb-4 p-3 rounded-xl bg-primary/10 border border-primary/20 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary text-[20px]">
+                    check_circle
+                  </span>
+                  <span className="text-primary text-sm">{formSuccess}</span>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                {/* Full Name */}
+                <div>
+                  <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
+                    Full Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${
+                      fieldErrors.name
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
+                        : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
+                    }`}
+                    placeholder="Enter full name"
+                  />
+                  {fieldErrors.name && (
+                    <p className="mt-1 text-xs text-red-400">
+                      {fieldErrors.name}
+                    </p>
+                  )}
+                </div>
+
+                {/* Employee Number */}
+                <div>
+                  <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
+                    Employee Number
+                  </label>
+                  <input
+                    type="text"
+                    name="emp_no"
+                    value={formData.emp_no}
+                    onChange={handleInputChange}
+                    className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${
+                      fieldErrors.emp_no
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
+                        : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
+                    }`}
+                    placeholder="33xx"
+                  />
+                  {fieldErrors.emp_no && (
+                    <p className="mt-1 text-xs text-red-400">
+                      {fieldErrors.emp_no}
+                    </p>
+                  )}
+                </div>
+
+                {/* Username */}
+                <div>
+                  <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
+                    Username <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="username"
+                    value={formData.username}
+                    onChange={handleInputChange}
+                    className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${
+                      fieldErrors.username
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
+                        : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
+                    }`}
+                    placeholder="username@dlt.lk"
+                  />
+                  {fieldErrors.username && (
+                    <p className="mt-1 text-xs text-red-400">
+                      {fieldErrors.username}
+                    </p>
+                  )}
+                </div>
+
+                {/* Password */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
+                      Password <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      name="password"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${
+                        fieldErrors.password
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
+                          : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
+                      }`}
+                      placeholder="Min 3 characters"
+                    />
+                    {fieldErrors.password && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {fieldErrors.password}
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
+                      Confirm Password <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="password"
+                      name="confirmPassword"
+                      value={formData.confirmPassword}
+                      onChange={handleInputChange}
+                      className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${
+                        fieldErrors.confirmPassword
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
+                          : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
+                      }`}
+                      placeholder="Re-enter password"
+                    />
+                    {fieldErrors.confirmPassword && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {fieldErrors.confirmPassword}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Mobile */}
+                <div>
+                  <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
+                    Mobile Number
+                  </label>
+                  <input
+                    type="tel"
+                    name="mobile"
+                    value={formData.mobile}
+                    onChange={handleInputChange}
+                    className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${
+                      fieldErrors.mobile
+                        ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
+                        : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
+                    }`}
+                    placeholder="07xxxxxxxx"
+                    maxLength={10}
+                  />
+                  {fieldErrors.mobile && (
+                    <p className="mt-1 text-xs text-red-400">
+                      {fieldErrors.mobile}
+                    </p>
+                  )}
+                </div>
+
+                {/* Branch & Department */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
+                      Branch
+                    </label>
+                    <select
+                      name="branch_id"
+                      value={formData.branch_id}
+                      onChange={handleInputChange}
+                      className="w-full h-11 px-4 rounded-xl bg-[#1d2d25] border border-[#28392f] text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Select Branch</option>
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
+                      Department
+                    </label>
+                    <select
+                      name="department_id"
+                      value={formData.department_id}
+                      onChange={handleInputChange}
+                      className="w-full h-11 px-4 rounded-xl bg-[#1d2d25] border border-[#28392f] text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="">Select Department</option>
+                      {departments.map((dept) => (
+                        <option key={dept.id} value={dept.id}>
+                          {dept.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-3 mt-6 pt-6 border-t border-[#28392f]">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="px-5 py-2.5 rounded-xl text-[#9cbaa8] hover:text-white hover:bg-[#28392f] font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-[#32d473] text-[#102217] font-bold transition-all shadow-[0_0_15px_rgba(61,245,135,0.2)] hover:shadow-[0_0_20px_rgba(61,245,135,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                          fill="none"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[20px]">
+                        person_add
+                      </span>
+                      <span>Create User</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

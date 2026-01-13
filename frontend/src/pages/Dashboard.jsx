@@ -2,8 +2,12 @@ import { useState } from 'react';
 import Header from '../components/layout/Header';
 import ModuleCard from '../components/features/ModuleCard';
 import ActivityWidget from '../components/features/ActivityWidget';
+import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
+  const { user } = useAuth();
+  const firstName = user?.name?.split(' ')[0] || 'User';
+
   const modules = [
     {
       id: 1,
@@ -97,7 +101,7 @@ const Dashboard = () => {
                 Dashboard
               </h2>
               <p className="text-lg text-slate-600 dark:text-[#9eb7a8]">
-                Welcome back, Alex!
+                Welcome back, {firstName}!
               </p>
             </div>
 

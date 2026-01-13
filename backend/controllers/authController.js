@@ -198,8 +198,42 @@ const loginAdmin = async (req, res, next) => {
   }
 };
 
+// Get public branches for registration
+const getPublicBranches = async (req, res, next) => {
+  try {
+    const branches = await Branch.findAll({
+      attributes: ['id', 'name'],
+      order: [['name', 'ASC']]
+    });
+    res.json({
+      success: true,
+      data: branches
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Get public departments for registration
+const getPublicDepartments = async (req, res, next) => {
+  try {
+    const departments = await Department.findAll({
+      attributes: ['id', 'name'],
+      order: [['name', 'ASC']]
+    });
+    res.json({
+      success: true,
+      data: departments
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   loginAdmin,
+  getPublicBranches,
+  getPublicDepartments,
 };

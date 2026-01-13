@@ -7,6 +7,10 @@ const { authenticateUser } = require('../middleware/auth');
 router.post('/register', authController.registerUser);
 router.post('/login', authController.loginUser);
 
+// Public lookup data for registration
+router.get('/branches', authController.getPublicBranches);
+router.get('/departments', authController.getPublicDepartments);
+
 // Admin routes
 router.post('/admin/login', authController.loginAdmin);
 
