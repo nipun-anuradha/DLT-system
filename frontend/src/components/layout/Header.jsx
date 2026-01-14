@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import dltLogo from '../../assets/dlt-logo.png';
 
 const Header = () => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const timeoutRef = useRef(null);
@@ -73,13 +77,16 @@ const Header = () => {
                     Edit Profile
                   </a>
                   <div className="h-px bg-slate-200 dark:bg-[#29382f] my-1"></div>
-                  <a
-                    className="px-4 py-3 text-sm text-red-600 hover:bg-slate-100 dark:hover:bg-[#25382e] transition-colors flex items-center gap-3"
-                    href="#"
+                  <button
+                    onClick={() => {
+                      logout();
+                      navigate('/login');
+                    }}
+                    className="w-full px-4 py-3 text-sm text-red-600 hover:bg-slate-100 dark:hover:bg-[#25382e] transition-colors flex items-center gap-3"
                   >
                     <span className="material-symbols-outlined text-[20px]">logout</span>
                     Logout
-                  </a>
+                  </button>
                 </div>
               </div>
             )}

@@ -1,68 +1,158 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '../components/layout/Header';
 import ModuleCard from '../components/features/ModuleCard';
 import ActivityWidget from '../components/features/ActivityWidget';
 import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
 
 const Dashboard = () => {
   const { user } = useAuth();
   const firstName = user?.name?.split(' ')[0] || 'User';
+  const [openTicketCount, setOpenTicketCount] = useState(0);
 
-  const modules = [
-    {
-      id: 1,
-      title: 'IT Support',
-      description: 'Manage tickets, view system status, and request hardware.',
-      icon: 'headset_mic',
-      status: 'active',
-      badge: {
-        icon: 'warning',
-        text: '12 Open Tickets',
-        color: 'yellow'
-      },
-      action: {
-        text: 'Access Portal',
-        enabled: true,
-        link: '/tickets'
+  // Fetch open ticket count on mount
+  useEffect(() => {
+    const fetchDashboardCounts = async () => {
+      try {
+        const response = await api.get('/user/tickets/dashboard/counts');
+        if (response.success) {
+          setOpenTicketCount(response.data.open || 0);
+        }
+      } catch (error) {
+        console.error('Failed to fetch dashboard counts:', error);
       }
+    };
+
+    fetchDashboardCounts();
+  }, []);
+
+const modules = [
+  {
+    id: 1,
+    title: 'IT Support',
+    description: 'Manage tickets, view system status, and request hardware.',
+    icon: 'headset_mic',
+    status: 'active',
+    badge: {
+      icon: 'warning',
+      text: `${openTicketCount} Open Ticket${openTicketCount !== 1 ? 's' : ''}`,
+      color: 'yellow'
     },
-    {
-      id: 2,
-      title: 'HR Support',
-      description: 'Employee directory, leave management, and benefits.',
-      icon: 'group',
-      status: 'coming-soon',
-      action: {
-        text: 'Locked',
-        icon: 'lock',
-        enabled: false
-      }
-    },
-    {
-      id: 3,
-      title: 'Finance',
-      description: 'Payroll processing, expense claims, and budgeting tools.',
-      icon: 'payments',
-      status: 'restricted',
-      action: {
-        text: 'Admin Only',
-        icon: 'lock_person',
-        enabled: false
-      }
-    },
-    {
-      id: 4,
-      title: 'Operations',
-      description: 'Facility management, logistics, and supply chain.',
-      icon: 'settings',
-      status: 'coming-soon',
-      action: {
-        text: 'Locked',
-        icon: 'lock',
-        enabled: false
-      }
+    action: {
+      text: 'Access Portal',
+      enabled: true,
+      link: '/tickets'
     }
-  ];
+  },
+  {
+    id: 2,
+    title: 'IT',
+    description: 'IT service report, infrastructure, and system monitoring',
+    icon: 'group',
+    status: 'coming-soon',
+    action: {
+      text: 'Locked',
+      icon: 'lock',
+      enabled: false
+    }
+  },
+  {
+    id: 2,
+    title: 'HR',
+    description: 'Employee directory, leave management, and benefits.',
+    icon: 'group',
+    status: 'coming-soon',
+    action: {
+      text: 'Locked',
+      icon: 'lock',
+      enabled: false
+    }
+  },
+  {
+    id: 3,
+    title: 'Supply Chain',
+    description: 'Procurement, logistics, and supplier management.',
+    icon: 'local_shipping',
+    status: 'coming-soon',
+    action: {
+      text: 'Locked',
+      icon: 'lock',
+      enabled: false
+    }
+  },
+  {
+    id: 4,
+    title: 'Engineering',
+    description: 'Design management, technical documentation, and approvals.',
+    icon: 'engineering',
+    status: 'coming-soon',
+    action: {
+      text: 'Locked',
+      icon: 'lock',
+      enabled: false
+    }
+  },
+  {
+    id: 5,
+    title: 'Production',
+    description: 'Production planning, schedules, and output monitoring.',
+    icon: 'factory',
+    status: 'coming-soon',
+    action: {
+      text: 'Locked',
+      icon: 'lock',
+      enabled: false
+    }
+  },
+  {
+    id: 6,
+    title: 'Stores',
+    description: 'Inventory tracking, stock movements, and audits.',
+    icon: 'inventory_2',
+    status: 'coming-soon',
+    action: {
+      text: 'Locked',
+      icon: 'lock',
+      enabled: false
+    }
+  },
+  {
+    id: 7,
+    title: 'Maintenance',
+    description: 'Equipment maintenance, breakdown reports, and schedules.',
+    icon: 'build',
+    status: 'coming-soon',
+    action: {
+      text: 'Locked',
+      icon: 'lock',
+      enabled: false
+    }
+  },
+  {
+    id: 8,
+    title: 'Finance',
+    description: 'Payroll, expense claims, and financial reporting.',
+    icon: 'payments',
+    status: 'coming-soon',
+    action: {
+      text: 'Locked',
+      icon: 'lock',
+      enabled: false
+    }
+  },
+  {
+    id: 9,
+    title: 'Quality Control',
+    description: 'Inspections, quality reports, and compliance tracking.',
+    icon: 'verified',
+    status: 'coming-soon',
+    action: {
+      text: 'Locked',
+      icon: 'lock',
+      enabled: false
+    }
+  }
+];
 
   const activities = [
     {

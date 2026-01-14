@@ -1,96 +1,207 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Sidebar from '../components/layout/Sidebar';
+import api from '../utils/api';
 
 const Tickets = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState('all');
+  const [activeFilter, setActiveFilter] = useState('my');
   const [statusFilter, setStatusFilter] = useState('all');
-
-  const stats = [
+  const [tickets, setTickets] = useState([]);
+  const [ticketsLoading, setTicketsLoading] = useState(true);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10,
+    hasNextPage: false,
+    hasPrevPage: false,
+  });
+  const [stats, setStats] = useState([
     {
       label: 'Total Tickets',
-      value: '124',
-      trend: 'up',
+      value: '0',
+      trend: 'flat',
       icon: 'folder',
       iconColor: 'text-slate-400',
+      key: 'total',
     },
     {
       label: 'Open Tickets',
-      value: '12',
-      trend: 'up',
+      value: '0',
+      trend: 'flat',
       icon: 'mark_email_unread',
       iconColor: 'text-primary',
       highlight: true,
+      key: 'open',
     },
     {
       label: 'In Progress',
-      value: '5',
+      value: '0',
       trend: 'flat',
       icon: 'pending',
       iconColor: 'text-blue-400',
+      key: 'inprogress',
     },
     {
       label: 'Closed Tickets',
-      value: '107',
-      trend: 'up',
+      value: '0',
+      trend: 'flat',
       icon: 'check_circle',
       iconColor: 'text-green-700 dark:text-green-900',
+      key: 'closed',
     },
-  ];
+  ]);
+  const [loading, setLoading] = useState(true);
 
-  const tickets = [
-    {
-      id: '#4921',
-      subject: 'Unable to access VPN',
-      priority: 'High',
-      priorityColor: 'red',
-      status: 'In Progress',
-      statusColor: 'blue',
-      created: 'Oct 24, 2023',
-      updated: '2 hrs ago',
-    },
-    {
-      id: '#4920',
-      subject: 'Software License Renewal',
-      priority: 'Medium',
-      priorityColor: 'amber',
-      status: 'Open',
-      statusColor: 'primary',
-      created: 'Oct 23, 2023',
-      updated: '1 day ago',
-    },
-    {
-      id: '#4918',
-      subject: 'Printer jamming on 2nd floor',
-      priority: 'Low',
-      priorityColor: 'slate',
-      status: 'Closed',
-      statusColor: 'slate',
-      created: 'Oct 20, 2023',
-      updated: '2 days ago',
-    },
-    {
-      id: '#4915',
-      subject: 'Request for new monitor',
-      priority: 'Low',
-      priorityColor: 'slate',
-      status: 'Open',
-      statusColor: 'primary',
-      created: 'Oct 18, 2023',
-      updated: '3 days ago',
-    },
-    {
-      id: '#4912',
-      subject: 'Zoom integration not working',
-      priority: 'High',
-      priorityColor: 'red',
-      status: 'Open',
-      statusColor: 'primary',
-      created: 'Oct 17, 2023',
-      updated: '4 days ago',
-    },
-  ];
+  // Fetch dashboard counts on mount
+  useEffect(() => {
+    const fetchDashboardCounts = async () => {
+      try {
+        const response = await api.get('/user/tickets/dashboard/counts');
+        if (response.success) {
+          const { total, open, inprogress, closed } = response.data;
+          setStats(prevStats => prevStats.map(stat => ({
+            ...stat,
+            value: String(response.data[stat.key] || 0),
+            trend: response.data[stat.key] > 0 ? 'up' : 'flat',
+          })));
+        }
+      } catch (error) {
+        console.error('Failed to fetch dashboard counts:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardCounts();
+  }, []);
+
+  // Fetch tickets with filters and pagination
+  const fetchTickets = useCallback(async (page = 1) => {
+    setTicketsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '10',
+        myTickets: activeFilter === 'my' ? 'true' : 'false',
+      });
+
+      if (statusFilter !== 'all') {
+        params.append('status', statusFilter);
+      }
+
+      if (searchQuery.trim()) {
+        params.append('search', searchQuery.trim());
+      }
+
+      const response = await api.get(`/user/tickets?${params.toString()}`);
+      if (response.success) {
+        setTickets(response.data);
+        setPagination(response.pagination);
+      }
+    } catch (error) {
+      console.error('Failed to fetch tickets:', error);
+    } finally {
+      setTicketsLoading(false);
+    }
+  }, [activeFilter, statusFilter, searchQuery]);
+
+  // Fetch tickets when filters change
+  useEffect(() => {
+    fetchTickets(1);
+  }, [activeFilter, statusFilter]);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchTickets(1);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Handle page change
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= pagination.totalPages) {
+      fetchTickets(page);
+    }
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages = [];
+    const { currentPage, totalPages } = pagination;
+    
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, '...', totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, '...', totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, '...', currentPage, '...', totalPages);
+      }
+    }
+    
+    return pages;
+  };
+
+  const getPriorityColor = (priority) => {
+    const colors = {
+      high: 'red',
+      medium: 'amber',
+      low: 'slate',
+    };
+    return colors[priority] || 'slate';
+  };
+
+  const getStatusColor = (status) => {
+    const colors = {
+      open: 'primary',
+      inprogress: 'blue',
+      close: 'slate',
+    };
+    return colors[status] || 'slate';
+  };
+
+  const getStatusLabel = (status) => {
+    const labels = {
+      open: 'Open',
+      inprogress: 'In Progress',
+      close: 'Closed',
+    };
+    return labels[status] || status;
+  };
+
+  const getPriorityLabel = (priority) => {
+    const labels = {
+      high: 'High',
+      medium: 'Medium',
+      low: 'Low',
+    };
+    return labels[priority] || priority;
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) return 'Just now';
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} mins ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hrs ago`;
+    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    return formatDate(dateString);
+  };
 
   const getPriorityClasses = (color) => {
     const colors = {
@@ -98,7 +209,7 @@ const Tickets = () => {
       amber: 'bg-amber-100 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400',
       slate: 'bg-slate-100 dark:bg-slate-500/10 text-slate-700 dark:text-slate-400',
     };
-    return colors[color];
+    return colors[color] || colors.slate;
   };
 
   const getStatusClasses = (color) => {
@@ -107,7 +218,7 @@ const Tickets = () => {
       primary: 'border-primary/30 text-emerald-700 dark:text-primary bg-primary/5',
       slate: 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400',
     };
-    return colors[color];
+    return colors[color] || colors.slate;
   };
 
   return (
@@ -200,8 +311,8 @@ const Tickets = () => {
                 >
                   <option value="all">All Status</option>
                   <option value="open">Open</option>
-                  <option value="in-progress">In Progress</option>
-                  <option value="closed">Closed</option>
+                  <option value="inprogress">In Progress</option>
+                  <option value="close">Closed</option>
                 </select>
               </div>
             </section>
@@ -236,78 +347,117 @@ const Tickets = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-[#29382f]">
-                    {tickets.map((ticket) => (
-                      <tr
-                        key={ticket.id}
-                        className="group hover:bg-gray-50 dark:hover:bg-[#21352b] transition-colors"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-500 dark:text-gray-400">
-                          {ticket.id}
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">
-                          {ticket.subject}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div
-                            className={`flex items-center gap-1.5 px-3 py-1 rounded-full w-fit ${getPriorityClasses(
-                              ticket.priorityColor
-                            )}`}
-                          >
-                            <div className={`w-1.5 h-1.5 rounded-full bg-${ticket.priorityColor}-500`}></div>
-                            <span className="text-xs font-bold">{ticket.priority}</span>
+                    {ticketsLoading ? (
+                      <tr>
+                        <td colSpan="7" className="px-6 py-12 text-center text-slate-500 dark:text-gray-400">
+                          <div className="flex items-center justify-center gap-2">
+                            <span className="material-symbols-outlined animate-spin">progress_activity</span>
+                            Loading tickets...
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div
-                            className={`flex items-center justify-center px-3 py-1 rounded-full border w-fit ${getStatusClasses(
-                              ticket.statusColor
-                            )}`}
-                          >
-                            <span className="text-xs font-bold">{ticket.status}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-gray-400">
-                          {ticket.created}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-gray-400">
-                          {ticket.updated}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <Link
-                            to="/ticket-detail/1"
-                            className="text-slate-400 hover:text-primary transition-colors p-2 rounded-full hover:bg-slate-100 dark:hover:bg-[#29382f] inline-flex items-center justify-center"
-                          >
-                            <span className="material-symbols-outlined text-[20px]">visibility</span>
-                          </Link>
                         </td>
                       </tr>
-                    ))}
+                    ) : tickets.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="px-6 py-12 text-center text-slate-500 dark:text-gray-400">
+                          <div className="flex flex-col items-center gap-2">
+                            <span className="material-symbols-outlined text-4xl">inbox</span>
+                            <p>No tickets found</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      tickets.map((ticket) => {
+                        const priorityColor = getPriorityColor(ticket.priority);
+                        const statusColor = getStatusColor(ticket.status);
+                        return (
+                          <tr
+                            key={ticket.id}
+                            className="group hover:bg-gray-50 dark:hover:bg-[#21352b] transition-colors"
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-500 dark:text-gray-400">
+                              #{ticket.id}
+                            </td>
+                            <td className="px-6 py-4 text-sm font-medium text-slate-900 dark:text-white">
+                              {ticket.subject}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-full w-fit ${getPriorityClasses(priorityColor)}`}
+                              >
+                                <div className={`w-1.5 h-1.5 rounded-full ${priorityColor === 'red' ? 'bg-red-500' : priorityColor === 'amber' ? 'bg-amber-500' : 'bg-slate-500'}`}></div>
+                                <span className="text-xs font-bold">{getPriorityLabel(ticket.priority)}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div
+                                className={`flex items-center justify-center px-3 py-1 rounded-full border w-fit ${getStatusClasses(statusColor)}`}
+                              >
+                                <span className="text-xs font-bold">{getStatusLabel(ticket.status)}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-gray-400">
+                              {formatDate(ticket.date)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-gray-400">
+                              {formatTimeAgo(ticket.updatedAt)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                              <Link
+                                to={`/ticket-detail/${ticket.id}`}
+                                className="text-slate-400 hover:text-primary transition-colors p-2 rounded-full hover:bg-slate-100 dark:hover:bg-[#29382f] inline-flex items-center justify-center"
+                              >
+                                <span className="material-symbols-outlined text-[20px]">visibility</span>
+                              </Link>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
 
               {/* Pagination */}
-              <div className="px-6 py-4 border-t border-gray-100 dark:border-[#29382f] flex items-center justify-between">
-                <p className="text-sm text-slate-500 dark:text-gray-400">Showing 1-5 of 124 tickets</p>
-                <div className="flex gap-2">
-                  <button className="size-8 flex items-center justify-center rounded-full bg-white dark:bg-[#1c2e24] border border-gray-200 dark:border-[#29382f] text-slate-500 dark:text-gray-400 hover:border-primary hover:text-primary transition-colors disabled:opacity-50">
-                    <span className="material-symbols-outlined text-sm">chevron_left</span>
-                  </button>
-                  <button className="size-8 flex items-center justify-center rounded-full bg-primary text-background-dark font-bold text-sm">
-                    1
-                  </button>
-                  <button className="size-8 flex items-center justify-center rounded-full bg-white dark:bg-[#1c2e24] border border-gray-200 dark:border-[#29382f] text-slate-500 dark:text-gray-400 hover:border-primary hover:text-primary transition-colors">
-                    2
-                  </button>
-                  <button className="size-8 flex items-center justify-center rounded-full bg-white dark:bg-[#1c2e24] border border-gray-200 dark:border-[#29382f] text-slate-500 dark:text-gray-400 hover:border-primary hover:text-primary transition-colors">
-                    3
-                  </button>
-                  <span className="flex items-center text-slate-400">...</span>
-                  <button className="size-8 flex items-center justify-center rounded-full bg-white dark:bg-[#1c2e24] border border-gray-200 dark:border-[#29382f] text-slate-500 dark:text-gray-400 hover:border-primary hover:text-primary transition-colors">
-                    <span className="material-symbols-outlined text-sm">chevron_right</span>
-                  </button>
+              {!ticketsLoading && tickets.length > 0 && (
+                <div className="px-6 py-4 border-t border-gray-100 dark:border-[#29382f] flex items-center justify-between">
+                  <p className="text-sm text-slate-500 dark:text-gray-400">
+                    Showing {((pagination.currentPage - 1) * pagination.itemsPerPage) + 1}-{Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)} of {pagination.totalItems} tickets
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handlePageChange(pagination.currentPage - 1)}
+                      disabled={!pagination.hasPrevPage}
+                      className="size-8 flex items-center justify-center rounded-full bg-white dark:bg-[#1c2e24] border border-gray-200 dark:border-[#29382f] text-slate-500 dark:text-gray-400 hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="material-symbols-outlined text-sm">chevron_left</span>
+                    </button>
+                    {getPageNumbers().map((page, index) => (
+                      page === '...' ? (
+                        <span key={`ellipsis-${index}`} className="flex items-center text-slate-400">...</span>
+                      ) : (
+                        <button
+                          key={page}
+                          onClick={() => handlePageChange(page)}
+                          className={`size-8 flex items-center justify-center rounded-full text-sm transition-colors ${
+                            pagination.currentPage === page
+                              ? 'bg-primary text-background-dark font-bold'
+                              : 'bg-white dark:bg-[#1c2e24] border border-gray-200 dark:border-[#29382f] text-slate-500 dark:text-gray-400 hover:border-primary hover:text-primary'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      )
+                    ))}
+                    <button
+                      onClick={() => handlePageChange(pagination.currentPage + 1)}
+                      disabled={!pagination.hasNextPage}
+                      className="size-8 flex items-center justify-center rounded-full bg-white dark:bg-[#1c2e24] border border-gray-200 dark:border-[#29382f] text-slate-500 dark:text-gray-400 hover:border-primary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <span className="material-symbols-outlined text-sm">chevron_right</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </section>
           </div>
         </div>
