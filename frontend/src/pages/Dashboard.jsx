@@ -9,21 +9,40 @@ const Dashboard = () => {
   const { user } = useAuth();
   const firstName = user?.name?.split(' ')[0] || 'User';
   const [openTicketCount, setOpenTicketCount] = useState(0);
+  const [notices, setNotices] = useState([]);
+  const [noticesLoading, setNoticesLoading] = useState(true);
 
-  // Fetch open ticket count on mount
+  // Fetch dashboard data on mount
   useEffect(() => {
-    const fetchDashboardCounts = async () => {
+    const fetchDashboardData = async () => {
       try {
-        const response = await api.get('/user/tickets/dashboard/counts');
-        if (response.success) {
-          setOpenTicketCount(response.data.open || 0);
+        // Fetch dashboard counts
+        const countsResponse = await api.get('/user/tickets/dashboard/counts');
+        if (countsResponse.success) {
+          setOpenTicketCount(countsResponse.data.open || 0);
+        }
+
+        // Fetch system notices
+        const noticesResponse = await api.get('/user/notices?limit=5');
+        if (noticesResponse.success) {
+          const formattedNotices = noticesResponse.data.map((notice) => ({
+            id: notice.id,
+            title: notice.topic,
+            description: notice.message,
+            icon: 'campaign',
+            iconColor: 'blue',
+            createdAt: notice.createdAt
+          }));
+          setNotices(formattedNotices);
         }
       } catch (error) {
-        console.error('Failed to fetch dashboard counts:', error);
+        console.error('Failed to fetch dashboard data:', error);
+      } finally {
+        setNoticesLoading(false);
       }
     };
 
-    fetchDashboardCounts();
+    fetchDashboardData();
   }, []);
 
 const modules = [
@@ -48,7 +67,7 @@ const modules = [
     id: 2,
     title: 'IT',
     description: 'IT service report, infrastructure, and system monitoring',
-    icon: 'group',
+    icon: 'computer',
     status: 'coming-soon',
     action: {
       text: 'Locked',
@@ -154,30 +173,6 @@ const modules = [
   }
 ];
 
-  const activities = [
-    {
-      id: 1,
-      title: 'System Maintenance Scheduled',
-      description: 'Nov 24, 2:00 AM - 4:00 AM',
-      icon: 'update',
-      iconColor: 'blue'
-    },
-    {
-      id: 2,
-      title: 'Ticket #1024 Resolved',
-      description: 'Network Issue - Main Office',
-      icon: 'check_circle',
-      iconColor: 'primary'
-    },
-    {
-      id: 3,
-      title: 'Policy Update Required',
-      description: 'Please review the new IT security policy.',
-      icon: 'priority_high',
-      iconColor: 'orange'
-    }
-  ];
-
   return (
     <div className="bg-background-light dark:bg-background-dark text-[#111418] dark:text-white font-display min-h-screen flex flex-col">
       <Header />
@@ -204,7 +199,7 @@ const modules = [
 
             {/* Quick Stats / Mini Dashboard Widget Area */}
             <div className="mt-12">
-              <ActivityWidget activities={activities} />
+              <ActivityWidget activities={notices} loading={noticesLoading} />
           </div>
         </div>
       </main>

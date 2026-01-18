@@ -1,22 +1,54 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '../../context';
+import { authService } from '../../services/authService';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { isAdminAuthenticated, adminLogin } = useAuth();
   const [formData, setFormData] = useState({
-    adminId: '',
+    username: '',
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAdminAuthenticated()) {
+      const from = location.state?.from?.pathname || '/admin/dashboard';
+      navigate(from, { replace: true });
+    }
+  }, [isAdminAuthenticated, navigate, location]);
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Handle admin login
-    console.log('Admin login attempt:', formData);
-    
-    // Redirect to admin dashboard
-    navigate('/admin/dashboard');
+    setError('');
+    setLoading(true);
+
+    try {
+      const response = await authService.adminLogin({
+        username: formData.username,
+        password: formData.password,
+      });
+
+      if (response.success) {
+        // Update context with admin data
+        adminLogin(response.data, response.token);
+        
+        // Redirect to intended destination or dashboard
+        const from = location.state?.from?.pathname || '/admin/dashboard';
+        navigate(from, { replace: true });
+      } else {
+        setError(response.message || 'Login failed. Please try again.');
+      }
+    } catch (err) {
+      setError(err.message || 'Invalid credentials. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -64,19 +96,20 @@ const AdminLogin = () => {
               <div className="space-y-1.5">
                 <label
                   className="block text-xs font-medium text-primary/80 uppercase tracking-wider ml-1"
-                  htmlFor="adminId"
+                  htmlFor="username"
                 >
-                  Admin Email
+                  Admin Username
                 </label>
                 <div className="input-dark rounded-lg flex items-center px-4 h-12">
                   <span className="material-symbols-outlined text-slate-500 mr-3 text-[20px]">badge</span>
                   <input
                     className="bg-transparent border-none p-0 text-sm w-full focus:ring-0 placeholder:text-slate-600 text-white font-medium"
-                    id="adminId"
-                    placeholder="admin@company.com"
+                    id="username"
+                    placeholder="admin"
                     type="text"
-                    value={formData.adminId}
-                    onChange={(e) => setFormData({ ...formData, adminId: e.target.value })}
+                    value={formData.username}
+                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                    disabled={loading}
                   />
                 </div>
               </div>
@@ -98,11 +131,13 @@ const AdminLogin = () => {
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    disabled={loading}
                   />
                   <button
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-primary transition-colors focus:outline-none"
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    disabled={loading}
                   >
                     <span className="material-symbols-outlined text-[20px]">
                       {showPassword ? 'visibility_off' : 'visibility'}
@@ -121,11 +156,21 @@ const AdminLogin = () => {
 
               {/* Login Button */}
               <button
-                className="mt-4 w-full h-12 bg-primary text-background-dark font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-[#00ff66] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#102217] focus:ring-primary active:scale-[0.98] transition-all shadow-lg shadow-primary/30 hover:shadow-primary/50"
+                className="mt-4 w-full h-12 bg-primary text-background-dark font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-[#00ff66] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#102217] focus:ring-primary active:scale-[0.98] transition-all shadow-lg shadow-primary/30 hover:shadow-primary/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
                 type="submit"
+                disabled={loading || !formData.username || !formData.password}
               >
-                <span className="material-symbols-outlined text-[20px]">lock_open</span>
-                Secure Login
+                {loading ? (
+                  <>
+                    <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
+                    Authenticating...
+                  </>
+                ) : (
+                  <>
+                    <span className="material-symbols-outlined text-[20px]">lock_open</span>
+                    Secure Login
+                  </>
+                )}
               </button>
             </form>
 

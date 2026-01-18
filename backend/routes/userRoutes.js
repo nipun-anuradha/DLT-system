@@ -8,7 +8,8 @@ const {
   getTicketById,
   getDashboardCounts,
   addMessage,
-  getNotices
+  getNotices,
+  closeTicket
 } = require('../controllers/userController');
 
 // All routes require user authentication
@@ -21,6 +22,7 @@ router.get('/tickets/dashboard/counts', getDashboardCounts);
 router.post('/tickets', upload.array('attachments', 5), handleUploadError, createTicket);
 router.get('/tickets', getTickets);
 router.get('/tickets/:id', getTicketById);
+router.put('/tickets/:id/close', closeTicket);
 router.post('/tickets/:id/messages', upload.array('attachments', 5), handleUploadError, addMessage);
 
 // Notice routes

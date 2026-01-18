@@ -9,6 +9,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localho
 
 export const API_ENDPOINTS = {
   LOGIN: '/auth/login',
+  ADMIN_LOGIN: '/auth/admin/login',
   LOGOUT: '/auth/logout',
   REFRESH_TOKEN: '/auth/refresh',
   FORGOT_PASSWORD: '/auth/forgot-password',
@@ -46,5 +47,7 @@ export const STORAGE_KEYS = {
   AUTH_TOKEN: 'auth_token',
   REFRESH_TOKEN: 'refresh_token',
   USER_DATA: 'user_data',
+  ADMIN_TOKEN: 'admin_token',
+  ADMIN_DATA: 'admin_data',
   THEME: 'theme'
 };

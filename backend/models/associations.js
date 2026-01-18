@@ -28,13 +28,17 @@ Ticket.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 Ticket.hasMany(Message, { foreignKey: 'ticket_id', as: 'messages' });
 Message.belongsTo(Ticket, { foreignKey: 'ticket_id', as: 'ticket' });
 
-// User - Message (for message sender)
-User.hasMany(Message, { foreignKey: 'user_id', as: 'sentMessages' });
-Message.belongsTo(User, { foreignKey: 'user_id', as: 'sender' });
+// User - Message (for message sender when sender_type is 'user')
+User.hasMany(Message, { foreignKey: 'sender_id', constraints: false, as: 'sentMessages' });
+Message.belongsTo(User, { foreignKey: 'sender_id', constraints: false, as: 'userSender' });
+
+// Admin - Message (for message sender when sender_type is 'admin')
+Admin.hasMany(Message, { foreignKey: 'sender_id', constraints: false, as: 'sentMessages' });
+Message.belongsTo(Admin, { foreignKey: 'sender_id', constraints: false, as: 'adminSender' });
 
 // User - Log
 User.hasMany(Log, { foreignKey: 'user_id', as: 'logs' });
-Log.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+Log.belongsTo(Log, { foreignKey: 'user_id', as: 'user' });
 
 // Admin - Log
 Admin.hasMany(Log, { foreignKey: 'Admin_id', as: 'logs' });

@@ -1,4 +1,4 @@
-const ActivityWidget = ({ activities }) => {
+const ActivityWidget = ({ activities, loading = false }) => {
   const getIconColorClasses = (color) => {
     const colors = {
       blue: 'bg-blue-500/10 text-blue-500',
@@ -7,6 +7,15 @@ const ActivityWidget = ({ activities }) => {
       yellow: 'bg-yellow-500/10 text-yellow-500'
     };
     return colors[color] || 'bg-slate-500/10 text-slate-500';
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
   };
 
   return (
@@ -21,28 +30,59 @@ const ActivityWidget = ({ activities }) => {
       </div>
 
       <div className="space-y-4">
-        {activities.map((activity) => (
-          <div
-            key={activity.id}
-            className="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-[#122017] transition-colors"
-          >
+        {loading ? (
+          // Loading skeleton
+          Array.from({ length: 3 }).map((_, index) => (
             <div
-              className={`size-10 rounded-full flex items-center justify-center ${getIconColorClasses(
-                activity.iconColor
-              )}`}
+              key={index}
+              className="flex items-center gap-4 p-3 rounded-lg animate-pulse"
             >
-              <span className="material-symbols-outlined text-[20px]">{activity.icon}</span>
+              <div className="size-10 rounded-full bg-slate-200 dark:bg-[#29382f]" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-slate-200 dark:bg-[#29382f] rounded w-3/4" />
+                <div className="h-3 bg-slate-200 dark:bg-[#29382f] rounded w-1/2" />
+              </div>
             </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                {activity.title}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-[#9eb7a8]">
-                {activity.description}
-              </p>
-            </div>
+          ))
+        ) : activities.length === 0 ? (
+          // Empty state
+          <div className="text-center py-8">
+            <span className="material-symbols-outlined text-4xl text-slate-400 dark:text-[#9eb7a8] mb-2">
+              notifications_off
+            </span>
+            <p className="text-sm text-slate-500 dark:text-[#9eb7a8]">
+              No notices available
+            </p>
           </div>
-        ))}
+        ) : (
+          activities.map((activity) => (
+            <div
+              key={activity.id}
+              className="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-[#122017] transition-colors"
+            >
+              <div
+                className={`size-10 rounded-full flex items-center justify-center ${getIconColorClasses(
+                  activity.iconColor
+                )}`}
+              >
+                <span className="material-symbols-outlined text-[20px]">{activity.icon}</span>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                  {activity.title}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-[#9eb7a8] line-clamp-2">
+                  {activity.description}
+                </p>
+                {activity.createdAt && (
+                  <p className="text-xs text-slate-400 dark:text-[#7a9a8a] mt-1">
+                    {formatDate(activity.createdAt)}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

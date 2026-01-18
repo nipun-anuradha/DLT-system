@@ -6,6 +6,10 @@ export const getAuthToken = () => {
   return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
 };
 
+export const getAdminToken = () => {
+  return localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN);
+};
+
 export const setAuthToken = (token) => {
   localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
 };
@@ -16,9 +20,20 @@ export const removeAuthToken = () => {
   localStorage.removeItem(STORAGE_KEYS.USER_DATA);
 };
 
+export const removeAdminToken = () => {
+  localStorage.removeItem(STORAGE_KEYS.ADMIN_TOKEN);
+  localStorage.removeItem(STORAGE_KEYS.ADMIN_DATA);
+};
+
+// Check if endpoint is an admin route
+const isAdminRoute = (endpoint) => {
+  return endpoint.startsWith('/admin') || endpoint.includes('/admin/');
+};
+
 // Base fetch wrapper
 export const apiRequest = async (endpoint, options = {}) => {
-  const token = getAuthToken();
+  // Use admin token for admin routes, otherwise use regular auth token
+  const token = isAdminRoute(endpoint) ? getAdminToken() : getAuthToken();
   
   const defaultHeaders = {
     'Content-Type': 'application/json',

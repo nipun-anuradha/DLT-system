@@ -1,8 +1,17 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context";
 import dltLogo from "../../assets/dlt-logo.png";
 
 const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { adminLogout } = useAuth();
+
+  // Handle logout
+  const handleLogout = () => {
+    adminLogout();
+    navigate('/admin');
+  };
 
   // Determine active page based on path
   const getActivePage = () => {
@@ -144,7 +153,7 @@ const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
           <Link
             onClick={onClose}
             className="flex items-center gap-3 px-3 py-3 rounded-xl text-[#9cbaa8] hover:bg-[#28392f] hover:text-white transition-all duration-200"
-            to="/admin/settings"
+            to="#"
           >
             <span className="material-symbols-outlined">settings</span>
             <p className="text-sm font-medium leading-normal">Settings</p>
@@ -159,7 +168,10 @@ const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
             <span className="material-symbols-outlined">help</span>
             <p className="text-sm font-medium leading-normal">Help & Support</p>
           </a>
-          <button className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl h-10 px-4 bg-[#28392f] hover:bg-[#34463b] text-white border border-[#3b5445] text-sm font-bold leading-normal tracking-[0.015em] transition-colors">
+          <button 
+            onClick={handleLogout}
+            className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl h-10 px-4 bg-[#28392f] hover:bg-[#34463b] text-white border border-[#3b5445] text-sm font-bold leading-normal tracking-[0.015em] transition-colors"
+          >
             <span className="truncate">Logout</span>
           </button>
         </div>

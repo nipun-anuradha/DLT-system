@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Ticket, Message, User, Branch, Department, Notice } = require('../models/associations');
+const { Ticket, Message, User, Admin, Branch, Department, Notice } = require('../models/associations');
 const path = require('path');
 
 // @desc    Create a new ticket
@@ -30,9 +30,10 @@ const createTicket = async (req, res, next) => {
 
     // Create the first message (description)
     await Message.create({
-      messagae: description,
       ticket_id: ticket.id,
-      user_id
+      sender_type: 'user',
+      sender_id: user_id,
+      message: description
     });
 
     // If there are attachments, create a second message for them
@@ -46,12 +47,13 @@ const createTicket = async (req, res, next) => {
       }));
 
       await Message.create({
-        messagae: JSON.stringify({
+        ticket_id: ticket.id,
+        sender_type: 'user',
+        sender_id: user_id,
+        message: JSON.stringify({
           type: 'attachment',
           files: attachmentPaths
-        }),
-        ticket_id: ticket.id,
-        user_id
+        })
       });
     }
 
@@ -61,7 +63,11 @@ const createTicket = async (req, res, next) => {
         {
           model: Message,
           as: 'messages',
-          include: [{ model: User, as: 'sender', attributes: ['id', 'name'] }]
+          include: [
+            { model: User, as: 'userSender', attributes: ['id', 'name'] },
+            { model: Admin, as: 'adminSender', attributes: ['id', 'username'] }
+          ],
+          order: [['createdAt', 'ASC']]
         },
         {
           model: User,
@@ -178,7 +184,10 @@ const getTicketById = async (req, res, next) => {
         {
           model: Message,
           as: 'messages',
-          include: [{ model: User, as: 'sender', attributes: ['id', 'name'] }]
+          include: [
+            { model: User, as: 'userSender', attributes: ['id', 'name'] },
+            { model: Admin, as: 'adminSender', attributes: ['id', 'username'] }
+          ]
         },
         {
           model: User,
@@ -189,7 +198,8 @@ const getTicketById = async (req, res, next) => {
             { model: Department, as: 'department', attributes: ['id', 'name'] }
           ]
         }
-      ]
+      ],
+      order: [[{ model: Message, as: 'messages' }, 'createdAt', 'ASC']]
     });
 
     if (!ticket) {
@@ -272,9 +282,10 @@ const addMessage = async (req, res, next) => {
     // Create text message if provided
     if (message) {
       const textMessage = await Message.create({
-        messagae: message,
         ticket_id: ticket.id,
-        user_id
+        sender_type: 'user',
+        sender_id: user_id,
+        message: message
       });
       createdMessages.push(textMessage);
     }
@@ -290,12 +301,13 @@ const addMessage = async (req, res, next) => {
       }));
 
       const attachmentMessage = await Message.create({
-        messagae: JSON.stringify({
+        ticket_id: ticket.id,
+        sender_type: 'user',
+        sender_id: user_id,
+        message: JSON.stringify({
           type: 'attachment',
           files: attachmentPaths
-        }),
-        ticket_id: ticket.id,
-        user_id
+        })
       });
       createdMessages.push(attachmentMessage);
     }
@@ -304,7 +316,10 @@ const addMessage = async (req, res, next) => {
     const messageIds = createdMessages.map(m => m.id);
     const fetchedMessages = await Message.findAll({
       where: { id: messageIds },
-      include: [{ model: User, as: 'sender', attributes: ['id', 'name'] }]
+      include: [
+        { model: User, as: 'userSender', attributes: ['id', 'name'] },
+        { model: Admin, as: 'adminSender', attributes: ['id', 'username'] }
+      ]
     });
 
     res.status(201).json({
@@ -351,11 +366,53 @@ const getNotices = async (req, res, next) => {
   }
 };
 
+// @desc    Close a ticket
+// @route   PUT /api/user/tickets/:id/close
+// @access  Private (User)
+const closeTicket = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const user_id = req.user.id;
+
+    // Check if ticket exists and belongs to user
+    const ticket = await Ticket.findOne({
+      where: { id, user_id }
+    });
+
+    if (!ticket) {
+      return res.status(404).json({
+        success: false,
+        message: 'Ticket not found'
+      });
+    }
+
+    // Check if ticket is already closed
+    if (ticket.status === 'close') {
+      return res.status(400).json({
+        success: false,
+        message: 'Ticket is already closed'
+      });
+    }
+
+    // Update ticket status to close
+    await ticket.update({ status: 'close' });
+
+    res.json({
+      success: true,
+      message: 'Ticket closed successfully',
+      data: ticket
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createTicket,
   getTickets,
   getTicketById,
   getDashboardCounts,
   addMessage,
-  getNotices
+  getNotices,
+  closeTicket
 };

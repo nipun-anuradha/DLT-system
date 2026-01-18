@@ -1,94 +1,161 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/layout/AdminSidebar';
+import { useAuth } from '../../context';
+import { usePolling } from '../../hooks';
+import api from '../../utils/api';
 
 const AdminDashboard = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [counts, setCounts] = useState({
+    totalTickets: 0,
+    openTickets: 0,
+    inprogressTickets: 0,
+    closedTickets: 0,
+    totalUsers: 0
+  });
+  const [recentTickets, setRecentTickets] = useState([]);
   const navigate = useNavigate();
+  const { admin } = useAuth();
+
+  // Fetch dashboard counts
+  const fetchCounts = useCallback(async () => {
+    try {
+      const response = await api.get('/admin/dashboard/counts');
+      if (response.success) {
+        setCounts(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching counts:', error);
+    }
+  }, []);
+
+  // Fetch recent tickets
+  const fetchRecentTickets = useCallback(async (status = 'all') => {
+    try {
+      setTicketsLoading(true);
+      const response = await api.get(`/admin/dashboard/recent-tickets?status=${status}&limit=5`);
+      if (response.success) {
+        setRecentTickets(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching recent tickets:', error);
+    } finally {
+      setTicketsLoading(false);
+    }
+  }, []);
+
+  // Initial data load
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchCounts(), fetchRecentTickets()]);
+      setLoading(false);
+    };
+    loadData();
+  }, [fetchCounts, fetchRecentTickets]);
+
+  // Poll for dashboard updates every 30 seconds
+  const fetchDashboardData = useCallback(() => {
+    fetchCounts();
+    fetchRecentTickets(activeFilter);
+  }, [fetchCounts, fetchRecentTickets, activeFilter]);
+
+  usePolling(fetchDashboardData, 30000);
+
+  // Handle filter change
+  const handleFilterChange = (status) => {
+    setActiveFilter(status);
+    fetchRecentTickets(status);
+  };
+
+  // Format number with commas
+  const formatNumber = (num) => {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  };
+
+  // Format date
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  // Get status color
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'open': return 'orange';
+      case 'inprogress': return 'blue';
+      case 'close': return 'green';
+      default: return 'gray';
+    }
+  };
+
+  // Get status label
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'open': return 'Open';
+      case 'inprogress': return 'In Progress';
+      case 'close': return 'Closed';
+      default: return status;
+    }
+  };
+
+  // Get priority color
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high': return 'red';
+      case 'medium': return 'yellow';
+      case 'low': return 'gray';
+      default: return 'gray';
+    }
+  };
 
   const stats = [
     {
       label: 'Total Tickets',
-      value: '1,245',
-      trending: 'up',
+      value: formatNumber(counts.totalTickets),
       icon: 'layers',
       color: 'primary',
     },
     {
       label: 'Open Tickets',
-      value: '42',
-      change: '8',
-      trending: 'up',
+      value: formatNumber(counts.openTickets),
       icon: 'warning',
       color: 'orange',
     },
     {
       label: 'In Progress',
-      value: '18',
-      trending: 'down',
+      value: formatNumber(counts.inprogressTickets),
       icon: 'schedule',
       color: 'blue',
     },
     {
       label: 'Closed Tickets',
-      value: '1,185',
-      trending: 'up',
+      value: formatNumber(counts.closedTickets),
       icon: 'check_circle',
       color: 'primary',
     },
     {
       label: 'Total Users',
-      value: '340',
-      trending: 'up',
+      value: formatNumber(counts.totalUsers),
       icon: 'group',
       color: 'primary',
     },
   ];
 
-  const recentTickets = [
-    {
-      id: '#1024',
-      subject: 'VPN Connection Failure',
-      requester: {
-        name: 'Sarah Jenkins',
-        avatar:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuAfdVGTmP4HoVzcab3au-YFZcLjTVJ2CIb8l6CyM2wiLaX7OJ5-Z39vGkmIbFhbSl7OuhdTw8Ctc1gFgMz4vzSw3n1fM3WHRimR1_NCpStsJoC5hFJ39hl9AzTpr2Hzsd32E8POsrTXImQGwZVMwz9tx5a4NbBzthGKEKC0U_JPTMygc2ZDyAA-5XoaW3ZXC8z-iLzJLAiTyn2DCB82Lxqg5jeYsPGEt4c055VAHAT29EWHv_IR-IVLAwjpUhrtolWdxuBhBSAE-h4',
-      },
-      status: 'Open',
-      statusColor: 'orange',
-      priority: 'High',
-      priorityColor: 'red',
-      date: 'Oct 24, 2023',
-    },
-    {
-      id: '#1023',
-      subject: 'Software License Renewal',
-      requester: {
-        name: 'Mike Ross',
-        avatar:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuBkWk2Q3QvFixBSp2kx7GH8yn02Ho3h1WWat3v5NcAmvFbp_kIoA3sAMGGI1NlzD0YY863mTRZV_9EGjPq0ov2NPbq6IbA-o3RRuc_ggwQGUTUmxFs8R4zfwKdPI-IFAkXl_ZEPhGnvor5vzF66H0rCIeoKLbbxIfUrcCT3bt7uBpRLMdfz4VL9yfgtSzeG9ZVpMos31_Frpk7JZwo5wMsdR2ufMpqxdCwjc4vYk42dOGEdE65SP8JdhT7-FxYQOhW0bcMJ4N1qFys',
-      },
-      status: 'In Progress',
-      statusColor: 'blue',
-      priority: 'Medium',
-      priorityColor: 'yellow',
-      date: 'Oct 24, 2023',
-    },
-    {
-      id: '#1022',
-      subject: 'Password Reset Request',
-      requester: {
-        name: 'Emily Blunt',
-        avatar:
-          'https://lh3.googleusercontent.com/aida-public/AB6AXuDB5D3qjEOC4vFmmw68C4uXru0ITbAgF7CkIq4eSErJNwaB90BHGsWgqWcWscWKRTH3EOzQxRiA098J0mYfPPdfxMbbpK_jjN2Dp1lUVmA32ByuuJIUeQ2qzVhDd0niiYBvIic7y7UwZ7HGjlFBrQtUI-r-74XmMDN3v-3ouy3TsdrhUl4fqnlmR1S5CX0Gy5NWvG0Oye56YWfjhSOaMkWJFbPnn0QQmYYRG2nK0rlg4HKW558dSfgUwUEkbkrM7BFQABeaXB9hsF8',
-      },
-      status: 'Closed',
-      statusColor: 'green',
-      priority: 'Low',
-      priorityColor: 'gray',
-      date: 'Oct 23, 2023',
-    },
-  ];
+  if (loading) {
+    return (
+      <div className="bg-background-dark text-white font-display h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <span className="material-symbols-outlined text-5xl text-primary animate-spin">progress_activity</span>
+          <p className="text-[#9cbaa8]">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display h-screen flex overflow-hidden">
@@ -131,8 +198,8 @@ const AdminDashboard = () => {
             </button>
             <div className="flex items-center gap-3 pl-4 border-l border-[#28392f]">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-white">Alex Morgan</p>
-                <p className="text-xs text-[#9cbaa8]">Super Admin</p>
+                <p className="text-sm font-medium text-white">{admin?.username || 'Admin'}</p>
+                <p className="text-xs text-[#9cbaa8]">Administrator</p>
               </div>
               <div className="relative size-10 rounded-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center border-2 border-[#28392f] shadow-lg">
                 <span className="material-symbols-outlined text-white text-xl">person</span>
@@ -168,23 +235,26 @@ const AdminDashboard = () => {
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div
-                      className={`bg-[#28392f] p-2 rounded-lg group-hover:bg-${stat.color === 'orange' ? 'orange' : stat.color === 'blue' ? 'blue' : 'primary'}/20 transition-colors`}
+                      className={`bg-[#28392f] p-2 rounded-lg ${
+                        stat.color === 'orange' 
+                          ? 'group-hover:bg-orange-500/20' 
+                          : stat.color === 'blue' 
+                          ? 'group-hover:bg-blue-500/20' 
+                          : 'group-hover:bg-primary/20'
+                      } transition-colors`}
                     >
                       <span
-                        className={`material-symbols-outlined text-white group-hover:text-${stat.color === 'orange' ? 'orange-500' : stat.color === 'blue' ? 'blue-500' : 'primary'} transition-colors`}
+                        className={`material-symbols-outlined text-white ${
+                          stat.color === 'orange' 
+                            ? 'group-hover:text-orange-500' 
+                            : stat.color === 'blue' 
+                            ? 'group-hover:text-blue-500' 
+                            : 'group-hover:text-primary'
+                        } transition-colors`}
                       >
                         {stat.icon}
                       </span>
                     </div>
-                    <span
-                      className={`text-xs font-bold px-2 py-1 rounded-full ${
-                        stat.trending === 'up'
-                          ? `text-${stat.color === 'orange' ? 'orange' : 'primary'}-500 bg-${stat.color === 'orange' ? 'orange' : 'primary'}-500/10`
-                          : 'text-[#9cbaa8] bg-[#28392f]'
-                      }`}
-                    >
-                      {stat.change}
-                    </span>
                   </div>
                   <p className="text-[#9cbaa8] text-sm font-medium mb-1">{stat.label}</p>
                   <h3 className="text-white text-2xl font-bold">{stat.value}</h3>
@@ -197,22 +267,55 @@ const AdminDashboard = () => {
               <div className="p-6 border-b border-[#28392f] flex flex-wrap justify-between items-center gap-4">
                 <h3 className="text-lg font-bold text-white">Recent Tickets</h3>
                 <div className="flex gap-2">
-                  <button className="px-3 py-1.5 rounded-lg text-xs font-medium bg-[#28392f] text-white hover:bg-[#34463b]">
+                  <button 
+                    onClick={() => handleFilterChange('all')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      activeFilter === 'all' 
+                        ? 'bg-[#28392f] text-white' 
+                        : 'text-[#9cbaa8] hover:text-white hover:bg-[#28392f]'
+                    }`}
+                  >
                     All
                   </button>
-                  <button className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#9cbaa8] hover:text-white hover:bg-[#28392f]">
+                  <button 
+                    onClick={() => handleFilterChange('open')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      activeFilter === 'open' 
+                        ? 'bg-[#28392f] text-white' 
+                        : 'text-[#9cbaa8] hover:text-white hover:bg-[#28392f]'
+                    }`}
+                  >
                     Open
                   </button>
-                  <button className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#9cbaa8] hover:text-white hover:bg-[#28392f]">
-                    Processing
+                  <button 
+                    onClick={() => handleFilterChange('inprogress')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      activeFilter === 'inprogress' 
+                        ? 'bg-[#28392f] text-white' 
+                        : 'text-[#9cbaa8] hover:text-white hover:bg-[#28392f]'
+                    }`}
+                  >
+                    In Progress
                   </button>
-                  <button className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#9cbaa8] hover:text-white hover:bg-[#28392f]">
+                  <button 
+                    onClick={() => handleFilterChange('close')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      activeFilter === 'close' 
+                        ? 'bg-[#28392f] text-white' 
+                        : 'text-[#9cbaa8] hover:text-white hover:bg-[#28392f]'
+                    }`}
+                  >
                     Closed
                   </button>
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto relative">
+                {ticketsLoading && (
+                  <div className="absolute inset-0 bg-background-dark/50 flex items-center justify-center z-10">
+                    <span className="material-symbols-outlined text-3xl text-primary animate-spin">progress_activity</span>
+                  </div>
+                )}
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-[#111814] text-[#9cbaa8] text-xs uppercase tracking-wider">
@@ -226,42 +329,67 @@ const AdminDashboard = () => {
                     </tr>
                   </thead>
                   <tbody className="text-sm divide-y divide-[#28392f]">
-                    {recentTickets.map((ticket) => (
-                      <tr key={ticket.id} className="group hover:bg-[#1f382a] transition-colors">
-                        <td className="px-6 py-4 text-white font-mono">{ticket.id}</td>
-                        <td className="px-6 py-4 text-white font-medium">{ticket.subject}</td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-6"
-                              style={{ backgroundImage: `url('${ticket.requester.avatar}')` }}
-                            ></div>
-                            <span className="text-white">{ticket.requester.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-${ticket.statusColor}-500/10 text-${ticket.statusColor}-500 border border-${ticket.statusColor}-500/20`}
-                          >
-                            <span className={`w-1.5 h-1.5 rounded-full bg-${ticket.statusColor}-500`}></span>
-                            {ticket.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`text-${ticket.priorityColor === 'red' ? 'red' : ticket.priorityColor === 'yellow' ? 'yellow' : '[#9cbaa8]'}-400 font-medium text-xs uppercase tracking-wider`}
-                          >
-                            {ticket.priority}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-[#9cbaa8]">{ticket.date}</td>
-                        <td className="px-6 py-4 text-right">
-                          <button className="text-[#9cbaa8] hover:text-white">
-                            <span className="material-symbols-outlined text-[20px]">more_vert</span>
-                          </button>
+                    {recentTickets.length === 0 ? (
+                      <tr>
+                        <td colSpan="7" className="px-6 py-8 text-center text-[#9cbaa8]">
+                          No tickets found
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      recentTickets.map((ticket) => (
+                        <tr key={ticket.id} className="group hover:bg-[#1f382a] transition-colors cursor-pointer" onClick={() => navigate(`/admin/tickets/${ticket.id}`)}>
+                          <td className="px-6 py-4 text-white font-mono">#{ticket.id}</td>
+                          <td className="px-6 py-4 text-white font-medium">{ticket.subject}</td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <div className="size-6 rounded-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center text-xs font-bold text-white">
+                                {ticket.user?.name?.charAt(0)?.toUpperCase() || 'U'}
+                              </div>
+                              <span className="text-white">{ticket.user?.name || 'Unknown'}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                                getStatusColor(ticket.status) === 'orange' 
+                                  ? 'bg-orange-500/10 text-orange-500 border border-orange-500/20' 
+                                  : getStatusColor(ticket.status) === 'blue'
+                                  ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20'
+                                  : 'bg-green-500/10 text-green-500 border border-green-500/20'
+                              }`}
+                            >
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                getStatusColor(ticket.status) === 'orange' 
+                                  ? 'bg-orange-500' 
+                                  : getStatusColor(ticket.status) === 'blue'
+                                  ? 'bg-blue-500'
+                                  : 'bg-green-500'
+                              }`}></span>
+                              {getStatusLabel(ticket.status)}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`font-medium text-xs uppercase tracking-wider ${
+                                getPriorityColor(ticket.priority) === 'red' 
+                                  ? 'text-red-400' 
+                                  : getPriorityColor(ticket.priority) === 'yellow'
+                                  ? 'text-yellow-400'
+                                  : 'text-[#9cbaa8]'
+                              }`}
+                            >
+                              {ticket.priority}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-[#9cbaa8]">{formatDate(ticket.date)}</td>
+                          <td className="px-6 py-4 text-right">
+                            <button className="text-[#9cbaa8] hover:text-white" onClick={(e) => e.stopPropagation()}>
+                              <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -277,7 +405,7 @@ const AdminDashboard = () => {
             </div>
 
             <footer className="mt-8 border-t border-[#28392f] pt-8 pb-4">
-              <p className="text-center text-[#9cbaa8] text-sm">© {new Date().getFullYear()} DLT IT.Admin Panel v1.0</p>
+              <p className="text-center text-[#9cbaa8] text-sm">© {new Date().getFullYear()} DLT IT Admin Panel v1.0</p>
             </footer>
           </div>
         </main>

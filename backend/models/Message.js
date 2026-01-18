@@ -8,10 +8,6 @@ const Message = sequelize.define('Message', {
     autoIncrement: true,
     allowNull: false,
   },
-  messagae: {
-    type: DataTypes.TEXT,
-    allowNull: false,
-  },
   ticket_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -20,13 +16,17 @@ const Message = sequelize.define('Message', {
       key: 'id'
     }
   },
-  user_id: {
+  sender_type: {
+    type: DataTypes.ENUM('admin', 'user'),
+    allowNull: false,
+  },
+  sender_id: {
     type: DataTypes.INTEGER,
-    allowNull: true,
-    references: {
-      model: 'user',
-      key: 'id'
-    }
+    allowNull: false,
+  },
+  message: {
+    type: DataTypes.TEXT,
+    allowNull: false,
   }
 }, {
   tableName: 'message',

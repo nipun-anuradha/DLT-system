@@ -4,7 +4,7 @@ import api from '../utils/api';
 import { API_ENDPOINTS, STORAGE_KEYS } from '../utils/constants';
 
 export const authService = {
-  // Login
+  // User Login
   login: async (credentials) => {
     try {
       const response = await api.post(API_ENDPOINTS.LOGIN, credentials);
@@ -14,8 +14,8 @@ export const authService = {
         if (response.refreshToken) {
           localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.refreshToken);
         }
-        if (response.user) {
-          localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(response.user));
+        if (response.data) {
+          localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(response.data));
         }
       }
       
@@ -25,7 +25,25 @@ export const authService = {
     }
   },
 
-  // Logout
+  // Admin Login
+  adminLogin: async (credentials) => {
+    try {
+      const response = await api.post(API_ENDPOINTS.ADMIN_LOGIN, credentials);
+      
+      if (response.token) {
+        localStorage.setItem(STORAGE_KEYS.ADMIN_TOKEN, response.token);
+        if (response.data) {
+          localStorage.setItem(STORAGE_KEYS.ADMIN_DATA, JSON.stringify(response.data));
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  // User Logout
   logout: async () => {
     try {
       await api.post(API_ENDPOINTS.LOGOUT);
@@ -39,15 +57,32 @@ export const authService = {
     }
   },
 
+  // Admin Logout
+  adminLogout: () => {
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.ADMIN_DATA);
+  },
+
   // Get current user
   getCurrentUser: () => {
     const userStr = localStorage.getItem(STORAGE_KEYS.USER_DATA);
     return userStr ? JSON.parse(userStr) : null;
   },
 
+  // Get current admin
+  getCurrentAdmin: () => {
+    const adminStr = localStorage.getItem(STORAGE_KEYS.ADMIN_DATA);
+    return adminStr ? JSON.parse(adminStr) : null;
+  },
+
   // Check if user is authenticated
   isAuthenticated: () => {
     return !!localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN);
+  },
+
+  // Check if admin is authenticated
+  isAdminAuthenticated: () => {
+    return !!localStorage.getItem(STORAGE_KEYS.ADMIN_TOKEN);
   },
 
   // Forgot password

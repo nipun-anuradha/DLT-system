@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import AdminSidebar from "../../components/layout/AdminSidebar";
 import { apiRequest } from "../../utils/api";
 import * as Yup from "yup";
+import { useAuth } from "../../context";
 
-// Validation schema for user form
-const userValidationSchema = Yup.object().shape({
+// Validation schema for creating user
+const createUserValidationSchema = Yup.object().shape({
   name: Yup.string()
     .required("Full name is required")
     .min(2, "Name must be at least 2 characters")
@@ -19,12 +20,46 @@ const userValidationSchema = Yup.object().shape({
     .max(100, "Username must not exceed 100 characters"),
   password: Yup.string()
     .required("Password is required")
-    .min(6, "Password must be at least 3 characters"),
+    .min(3, "Password must be at least 3 characters"),
   confirmPassword: Yup.string()
     .required("Please confirm your password")
     .oneOf([Yup.ref("password")], "Passwords must match"),
   mobile: Yup.string()
     .required("Mobile number is required")
+    .matches(/^\d{10}$/, "Mobile number must be exactly 10 digits"),
+  branch_id: Yup.number()
+    .required("Branch is required")
+    .typeError("Branch is required"),
+  department_id: Yup.number()
+    .required("Department is required")
+    .typeError("Department is required"),
+});
+
+// Validation schema for editing user (password optional)
+const editUserValidationSchema = Yup.object().shape({
+  name: Yup.string()
+    .required("Full name is required")
+    .min(2, "Name must be at least 2 characters")
+    .max(100, "Name must not exceed 100 characters"),
+  emp_no: Yup.string()
+    .max(45, "Employee number must not exceed 45 characters")
+    .nullable(),
+  username: Yup.string()
+    .required("Username is required")
+    .min(3, "Username must be at least 3 characters")
+    .max(100, "Username must not exceed 100 characters"),
+  password: Yup.string()
+    .test("password-min", "Password must be at least 3 characters", function(value) {
+      if (!value || value === "") return true;
+      return value.length >= 3;
+    }),
+  confirmPassword: Yup.string()
+    .test("passwords-match", "Passwords must match", function(value) {
+      const { password } = this.parent;
+      if (!password || password === "") return true;
+      return value === password;
+    }),
+  mobile: Yup.string()
     .matches(/^$|^\d{10}$/, "Mobile number must be exactly 10 digits")
     .nullable(),
   branch_id: Yup.number().nullable(),
@@ -37,7 +72,9 @@ const AdminUsers = () => {
   const [selectAll, setSelectAll] = useState(false);
 
   // Modal state
-  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingUserId, setEditingUserId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
@@ -45,6 +82,19 @@ const AdminUsers = () => {
   // Lookup data
   const [branches, setBranches] = useState([]);
   const [departments, setDepartments] = useState([]);
+
+  // Users data state
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10,
+    hasNextPage: false,
+    hasPrevPage: false,
+  });
 
   // Form state
   const [formData, setFormData] = useState({
@@ -61,6 +111,37 @@ const AdminUsers = () => {
   // Field-level errors
   const [fieldErrors, setFieldErrors] = useState({});
 
+  const { admin } = useAuth();
+
+  // Fetch users from API
+  const fetchUsers = async (page = 1, search = "") => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: "10",
+      });
+      if (search) {
+        params.append("search", search);
+      }
+      const response = await apiRequest(`/admin/users?${params.toString()}`);
+      setUsers(response.data || []);
+      setPagination(response.pagination || {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems: 0,
+        itemsPerPage: 10,
+        hasNextPage: false,
+        hasPrevPage: false,
+      });
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Fetch branches and departments on mount
   useEffect(() => {
     const fetchLookupData = async () => {
@@ -76,7 +157,44 @@ const AdminUsers = () => {
       }
     };
     fetchLookupData();
+    fetchUsers();
   }, []);
+
+  // Handle search with debounce
+  useEffect(() => {
+    const debounceTimer = setTimeout(() => {
+      fetchUsers(1, searchQuery);
+    }, 300);
+    return () => clearTimeout(debounceTimer);
+  }, [searchQuery]);
+
+  // Handle page change
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      fetchUsers(newPage, searchQuery);
+    }
+  };
+
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages = [];
+    const { currentPage, totalPages } = pagination;
+    
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, "...", totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, "...", totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages);
+      }
+    }
+    return pages;
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -106,11 +224,34 @@ const AdminUsers = () => {
 
   const handleOpenModal = () => {
     resetForm();
-    setIsAddUserModalOpen(true);
+    setIsEditMode(false);
+    setEditingUserId(null);
+    setIsUserModalOpen(true);
+  };
+
+  const handleOpenEditModal = (user) => {
+    setFormData({
+      name: user.name || "",
+      emp_no: user.emp_no || "",
+      username: user.username || "",
+      password: "",
+      confirmPassword: "",
+      mobile: user.mobile || "",
+      branch_id: user.branch_id || "",
+      department_id: user.department_id || "",
+    });
+    setFormError("");
+    setFormSuccess("");
+    setFieldErrors({});
+    setIsEditMode(true);
+    setEditingUserId(user.id);
+    setIsUserModalOpen(true);
   };
 
   const handleCloseModal = () => {
-    setIsAddUserModalOpen(false);
+    setIsUserModalOpen(false);
+    setIsEditMode(false);
+    setEditingUserId(null);
     resetForm();
   };
 
@@ -120,9 +261,12 @@ const AdminUsers = () => {
     setFormSuccess("");
     setFieldErrors({});
 
+    // Choose validation schema based on mode
+    const validationSchema = isEditMode ? editUserValidationSchema : createUserValidationSchema;
+
     try {
       // Validate with Yup
-      await userValidationSchema.validate(formData, { abortEarly: false });
+      await validationSchema.validate(formData, { abortEarly: false });
     } catch (validationError) {
       if (validationError instanceof Yup.ValidationError) {
         const errors = {};
@@ -143,7 +287,6 @@ const AdminUsers = () => {
       const payload = {
         name: formData.name,
         username: formData.username,
-        password: formData.password,
         emp_no: formData.emp_no || null,
         mobile: formData.mobile || null,
         branch_id: formData.branch_id ? parseInt(formData.branch_id) : null,
@@ -152,128 +295,39 @@ const AdminUsers = () => {
           : null,
       };
 
-      await apiRequest("/admin/users", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      // Only include password if it's provided (required for create, optional for edit)
+      if (formData.password) {
+        payload.password = formData.password;
+      }
 
-      setFormSuccess(
-        "User created successfully! They can now login with their credentials."
-      );
+      if (isEditMode) {
+        // Update existing user
+        await apiRequest(`/admin/users/${editingUserId}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        });
+        setFormSuccess("User updated successfully!");
+      } else {
+        // Create new user
+        await apiRequest("/admin/users", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        setFormSuccess(
+          "User created successfully! They can now login with their credentials."
+        );
+      }
+
       setTimeout(() => {
         handleCloseModal();
-        // TODO: Refresh users list
+        // Refresh users list
+        fetchUsers(pagination.currentPage, searchQuery);
       }, 2000);
     } catch (error) {
-      setFormError(error.message || "Failed to create user");
+      setFormError(error.message || (isEditMode ? "Failed to update user" : "Failed to create user"));
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const users = [
-    {
-      id: 1,
-      name: "Liam Johnson",
-      email: "liam.j@managesys.com",
-      employeeId: "EMP-2049",
-      role: "Administrator",
-      roleIcon: "admin_panel_settings",
-      roleColor: "purple",
-      status: "Active",
-      statusColor: "primary",
-      lastLogin: "Oct 24, 2023 09:41 AM",
-      avatar:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuCkfhwYdca94H5WJBEBaShl9H1FG-oTZdOKmKlQDkR3U-SfOD46svi1FJ2qg4kQSPrdYNVupwSmaTdNRdnpREWiC344ULLji1JxZf5kf25j-jyxdZbPbMg1ADFiQErWLBoCTJB-qsO5LpDuqLROxF780FYfEDBhqLoO-N38M1BpHEjLSemBeS_Vw0A0H4qOLXlGuisg_yOk458ORUXPTPc_Sq2ZQLiA9kBvSoS7UoIFMX6CJsEMnQSlXrFK_OgcwRhNKZDeS0P75w8",
-    },
-    {
-      id: 2,
-      name: "Olivia Smith",
-      email: "o.smith@managesys.com",
-      employeeId: "EMP-3912",
-      role: "User",
-      roleIcon: "person",
-      roleColor: "blue",
-      status: "Active",
-      statusColor: "primary",
-      lastLogin: "Oct 23, 2023 04:15 PM",
-      avatar:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuAXaB5St52SfWsCuhWOfk52JJqw4BR2pgAz-Tedoz0h8lQ4uQ2cCmp2rPNBtlghTyPiTGCUQwUj9KbpIvTn6o2u2B2WzpcI_vVeA8hW8wfV-RA1D1I17SimOeFjuHfvRChfvk5s12ktqUrGVxJmuK_YSqFMtRLbcKxtPYmsfGYi2TnvTpSlFJO8n8i6l4QhJdBVbTxOYNELfK0SFVRurDe0d45PLfNHfx2xEtiwnrlWLzzNsDw6GB5Nz07Fa3QW0WRCd6GNEMFhU0g",
-    },
-    {
-      id: 3,
-      name: "Ethan Scott",
-      email: "ethan.s@managesys.com",
-      employeeId: "EMP-1102",
-      role: "Support Agent",
-      roleIcon: "support_agent",
-      roleColor: "orange",
-      status: "Disabled",
-      statusColor: "gray",
-      lastLogin: "Sep 12, 2023 11:00 AM",
-      initials: "ES",
-    },
-    {
-      id: 4,
-      name: "Noah Williams",
-      email: "n.williams@managesys.com",
-      employeeId: "EMP-4401",
-      role: "User",
-      roleIcon: "person",
-      roleColor: "blue",
-      status: "Active",
-      statusColor: "primary",
-      lastLogin: "Oct 22, 2023 02:20 PM",
-      avatar:
-        "https://lh3.googleusercontent.com/aida-public/AB6AXuDfzxm6EeukL5iXGqBrdPSeBueswU02q6GStWJ7m3PQyR6nG4j89Uc9-sDTmleaZ1nJA_I60qi7M0mCoFNlFBee8FXTCPk50MMnjlZKOpBiUrrsEJwnag8J-LUtmNjG4QCSER43I9HT0OLQF_jXF9VLICkWa-9pDLZJqi3wbG_LxvUxnjI0wnTjyMCbuELOYeTgX5ES9EpTvb4gfcjFmjwTU4LSG9i1B5Yjwmg4FiKFkZYRMoet3-lTGqVNL3PJkOBJ1cVkvhT99Bg",
-    },
-    {
-      id: 5,
-      name: "Ava Martinez",
-      email: "ava.m@managesys.com",
-      employeeId: "EMP-5122",
-      role: "User",
-      roleIcon: "person",
-      roleColor: "blue",
-      status: "Pending",
-      statusColor: "yellow",
-      lastLogin: "Never",
-      initials: "AV",
-    },
-  ];
-
-  const getStatusBadge = (status, statusColor) => {
-    const colors = {
-      primary: "bg-primary/10 text-primary border-primary/20",
-      gray: "bg-gray-500/10 text-gray-400 border-gray-500/20",
-      yellow: "bg-yellow-500/10 text-yellow-400 border-yellow-500/20",
-    };
-
-    const dotColors = {
-      primary: "bg-primary",
-      gray: "bg-gray-400",
-      yellow: "bg-yellow-400",
-    };
-
-    return (
-      <span
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${colors[statusColor]}`}
-      >
-        <span
-          className={`size-1.5 rounded-full ${dotColors[statusColor]}`}
-        ></span>
-        {status}
-      </span>
-    );
-  };
-
-  const getRoleIconColor = (color) => {
-    const colors = {
-      purple: "text-purple-400",
-      blue: "text-blue-400",
-      orange: "text-orange-400",
-    };
-    return colors[color] || "text-blue-400";
   };
 
   const handleSelectAll = (e) => {
@@ -339,8 +393,8 @@ const AdminUsers = () => {
             </button>
             <div className="flex items-center gap-3 pl-4 border-l border-[#28392f]">
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-white">Alex Morgan</p>
-                <p className="text-xs text-[#9cbaa8]">Super Admin</p>
+                <p className="text-sm font-medium text-white">{admin?.username || 'Admin'}</p>
+                <p className="text-xs text-[#9cbaa8]">Administrator</p>
               </div>
               <div className="relative size-10 rounded-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center border-2 border-[#28392f] shadow-lg">
                 <span className="material-symbols-outlined text-white text-xl">
@@ -405,8 +459,18 @@ const AdminUsers = () => {
                   </span>
                   <input
                     className="flex-1 bg-transparent text-white placeholder-[#5a7063] focus:outline-none text-base"
-                    placeholder="Search by Name, ID or Email"
+                    placeholder="Search by Name, Username, Emp No or Mobile"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
                   />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="text-[#9cbaa8] hover:text-white transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                  )}
                 </label>
               </div>
             </div>
@@ -425,232 +489,220 @@ const AdminUsers = () => {
                           onChange={handleSelectAll}
                         />
                       </th>
-                      <th className="p-4 border-b border-[#28392f] cursor-pointer hover:text-white transition-colors group">
-                        <div className="flex items-center gap-1">
-                          User Details{" "}
-                          <span className="material-symbols-outlined text-[16px] opacity-0 group-hover:opacity-100">
-                            arrow_drop_down
-                          </span>
-                        </div>
-                      </th>
-                      <th className="p-4 border-b border-[#28392f]">
-                        Employee ID
-                      </th>
-                      <th className="p-4 border-b border-[#28392f]">Role</th>
-                      <th className="p-4 border-b border-[#28392f]">Status</th>
-                      <th className="p-4 border-b border-[#28392f]">
-                        Last Login
-                      </th>
+                      <th className="p-4 border-b border-[#28392f]">ID</th>
+                      <th className="p-4 border-b border-[#28392f]">Name</th>
+                      <th className="p-4 border-b border-[#28392f]">Username</th>
+                      <th className="p-4 border-b border-[#28392f]">Emp No</th>
+                      <th className="p-4 border-b border-[#28392f]">Mobile</th>
+                      <th className="p-4 border-b border-[#28392f]">Branch</th>
+                      <th className="p-4 border-b border-[#28392f]">Department</th>
                       <th className="p-4 border-b border-[#28392f] text-right">
                         Actions
                       </th>
                     </tr>
                   </thead>
                   <tbody className="text-sm divide-y divide-[#28392f]">
-                    {users.map((user) => (
-                      <tr
-                        key={user.id}
-                        className="hover:bg-[#1d3326] transition-colors group"
-                      >
-                        <td className="p-4">
-                          <input
-                            className="rounded border-gray-600 bg-[#28392f] text-primary focus:ring-0 focus:ring-offset-0"
-                            type="checkbox"
-                            checked={selectedUsers.includes(user.id)}
-                            onChange={() => handleSelectUser(user.id)}
-                          />
-                        </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            {user.avatar ? (
-                              <div
-                                className="bg-center bg-no-repeat bg-cover rounded-full size-9"
-                                style={{
-                                  backgroundImage: `url('${user.avatar}')`,
-                                }}
-                              ></div>
-                            ) : (
-                              <div
-                                className={`flex items-center justify-center bg-${
-                                  user.initials === "ES" ? "blue" : "purple"
-                                }-500/20 text-${
-                                  user.initials === "ES" ? "blue" : "purple"
-                                }-400 rounded-full size-9 font-bold text-sm`}
-                              >
-                                {user.initials}
-                              </div>
-                            )}
-                            <div className="flex flex-col">
-                              <span className="text-white font-medium">
-                                {user.name}
-                              </span>
-                              <span className="text-[#9cbaa8] text-xs">
-                                {user.email}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-4 text-white font-mono text-xs">
-                          {user.employeeId}
-                        </td>
-                        <td className="p-4 text-white">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`material-symbols-outlined text-[18px] ${getRoleIconColor(
-                                user.roleColor
-                              )}`}
-                            >
-                              {user.roleIcon}
-                            </span>
-                            <span>{user.role}</span>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          {getStatusBadge(user.status, user.statusColor)}
-                        </td>
-                        <td
-                          className={`p-4 ${
-                            user.lastLogin === "Never"
-                              ? "text-[#9cbaa8] italic text-xs"
-                              : "text-[#9cbaa8]"
-                          }`}
-                        >
-                          {user.lastLogin}
-                        </td>
-                        <td className="p-4 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              className="p-2 text-[#9cbaa8] hover:text-white hover:bg-[#28392f] rounded-lg transition-colors"
-                              title="View Details"
-                            >
-                              <span className="material-symbols-outlined text-[20px]">
-                                visibility
-                              </span>
-                            </button>
-                            {user.status === "Disabled" ? (
-                              <button
-                                className="p-2 text-[#9cbaa8] hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                                title="Enable User"
-                              >
-                                <span className="material-symbols-outlined text-[20px]">
-                                  check_circle
-                                </span>
-                              </button>
-                            ) : user.status === "Pending" ? (
-                              <button
-                                className="p-2 text-[#9cbaa8] hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                                title="Resend Invite"
-                              >
-                                <span className="material-symbols-outlined text-[20px]">
-                                  send
-                                </span>
-                              </button>
-                            ) : (
-                              <button
-                                className="p-2 text-[#9cbaa8] hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
-                                title="Disable User"
-                              >
-                                <span className="material-symbols-outlined text-[20px]">
-                                  block
-                                </span>
-                              </button>
-                            )}
+                    {loading ? (
+                      <tr>
+                        <td colSpan="9" className="p-8 text-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <svg className="animate-spin h-8 w-8 text-primary" viewBox="0 0 24 24">
+                              <circle
+                                className="opacity-25"
+                                cx="12"
+                                cy="12"
+                                r="10"
+                                stroke="currentColor"
+                                strokeWidth="4"
+                                fill="none"
+                              />
+                              <path
+                                className="opacity-75"
+                                fill="currentColor"
+                                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                              />
+                            </svg>
+                            <span className="text-[#9cbaa8]">Loading users...</span>
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    ) : users.length === 0 ? (
+                      <tr>
+                        <td colSpan="9" className="p-8 text-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <span className="material-symbols-outlined text-[48px] text-[#5a7063]">
+                              person_off
+                            </span>
+                            <span className="text-[#9cbaa8]">
+                              {searchQuery ? "No users found matching your search" : "No users found"}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      users.map((user) => (
+                        <tr
+                          key={user.id}
+                          className="hover:bg-[#1d3326] transition-colors group"
+                        >
+                          <td className="p-4">
+                            <input
+                              className="rounded border-gray-600 bg-[#28392f] text-primary focus:ring-0 focus:ring-offset-0"
+                              type="checkbox"
+                              checked={selectedUsers.includes(user.id)}
+                              onChange={() => handleSelectUser(user.id)}
+                            />
+                          </td>
+                          <td className="p-4 text-white font-mono text-xs">
+                            {user.id}
+                          </td>
+                          <td className="p-4 text-white font-medium">
+                            {user.name}
+                          </td>
+                          <td className="p-4 text-[#9cbaa8]">
+                            {user.username}
+                          </td>
+                          <td className="p-4 text-white font-mono text-xs">
+                            {user.emp_no || "-"}
+                          </td>
+                          <td className="p-4 text-[#9cbaa8]">
+                            {user.mobile || "-"}
+                          </td>
+                          <td className="p-4 text-[#9cbaa8]">
+                            {user.branch?.name || "-"}
+                          </td>
+                          <td className="p-4 text-[#9cbaa8]">
+                            {user.department?.name || "-"}
+                          </td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                className="p-2 text-[#9cbaa8] hover:text-white hover:bg-[#28392f] rounded-lg transition-colors"
+                                title="View Details"
+                              >
+                                <span className="material-symbols-outlined text-[20px]">
+                                  visibility
+                                </span>
+                              </button>
+                              <button
+                                onClick={() => handleOpenEditModal(user)}
+                                className="p-2 text-[#9cbaa8] hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors"
+                                title="Edit User"
+                              >
+                                <span className="material-symbols-outlined text-[20px]">
+                                  edit
+                                </span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
 
               {/* Pagination Footer */}
-              <div className="flex items-center justify-between border-t border-[#28392f] bg-[#15261d] px-4 py-3 sm:px-6">
-                <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm text-[#9cbaa8]">
-                      Showing <span className="font-medium text-white">1</span>{" "}
-                      to <span className="font-medium text-white">5</span> of{" "}
-                      <span className="font-medium text-white">42</span> results
-                    </p>
+              {!loading && users.length > 0 && (
+                <div className="flex items-center justify-between border-t border-[#28392f] bg-[#15261d] px-4 py-3 sm:px-6">
+                  <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm text-[#9cbaa8]">
+                        Showing{" "}
+                        <span className="font-medium text-white">
+                          {((pagination.currentPage - 1) * pagination.itemsPerPage) + 1}
+                        </span>{" "}
+                        to{" "}
+                        <span className="font-medium text-white">
+                          {Math.min(pagination.currentPage * pagination.itemsPerPage, pagination.totalItems)}
+                        </span>{" "}
+                        of{" "}
+                        <span className="font-medium text-white">
+                          {pagination.totalItems}
+                        </span>{" "}
+                        results
+                      </p>
+                    </div>
+                    <div>
+                      <nav
+                        aria-label="Pagination"
+                        className="isolate inline-flex -space-x-px rounded-md shadow-sm"
+                      >
+                        <button
+                          onClick={() => handlePageChange(pagination.currentPage - 1)}
+                          disabled={!pagination.hasPrevPage}
+                          className="relative inline-flex items-center rounded-l-lg px-2 py-2 text-[#9cbaa8] ring-1 ring-inset ring-[#28392f] hover:bg-[#28392f] hover:text-white focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#9cbaa8]"
+                        >
+                          <span className="sr-only">Previous</span>
+                          <span className="material-symbols-outlined text-[20px]">
+                            chevron_left
+                          </span>
+                        </button>
+                        {getPageNumbers().map((pageNum, index) => (
+                          pageNum === "..." ? (
+                            <span
+                              key={`ellipsis-${index}`}
+                              className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-[#9cbaa8] ring-1 ring-inset ring-[#28392f]"
+                            >
+                              ...
+                            </span>
+                          ) : (
+                            <button
+                              key={pageNum}
+                              onClick={() => handlePageChange(pageNum)}
+                              className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ring-1 ring-inset focus:z-20 focus:outline-offset-0 ${
+                                pageNum === pagination.currentPage
+                                  ? "z-10 bg-primary/10 text-primary ring-primary/30"
+                                  : "text-[#9cbaa8] ring-[#28392f] hover:bg-[#28392f] hover:text-white"
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          )
+                        ))}
+                        <button
+                          onClick={() => handlePageChange(pagination.currentPage + 1)}
+                          disabled={!pagination.hasNextPage}
+                          className="relative inline-flex items-center rounded-r-lg px-2 py-2 text-[#9cbaa8] ring-1 ring-inset ring-[#28392f] hover:bg-[#28392f] hover:text-white focus:z-20 focus:outline-offset-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-[#9cbaa8]"
+                        >
+                          <span className="sr-only">Next</span>
+                          <span className="material-symbols-outlined text-[20px]">
+                            chevron_right
+                          </span>
+                        </button>
+                      </nav>
+                    </div>
                   </div>
-                  <div>
-                    <nav
-                      aria-label="Pagination"
-                      className="isolate inline-flex -space-x-px rounded-md shadow-sm"
-                    >
-                      <a
-                        className="relative inline-flex items-center rounded-l-lg px-2 py-2 text-[#9cbaa8] ring-1 ring-inset ring-[#28392f] hover:bg-[#28392f] hover:text-white focus:z-20 focus:outline-offset-0"
-                        href="#"
-                      >
-                        <span className="sr-only">Previous</span>
-                        <span className="material-symbols-outlined text-[20px]">
-                          chevron_left
-                        </span>
-                      </a>
-                      <a
-                        aria-current="page"
-                        className="relative z-10 inline-flex items-center bg-primary/10 px-4 py-2 text-sm font-semibold text-primary ring-1 ring-inset ring-primary/30 focus:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                        href="#"
-                      >
-                        1
-                      </a>
-                      <a
-                        className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-[#9cbaa8] ring-1 ring-inset ring-[#28392f] hover:bg-[#28392f] hover:text-white focus:z-20 focus:outline-offset-0"
-                        href="#"
-                      >
-                        2
-                      </a>
-                      <a
-                        className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-[#9cbaa8] ring-1 ring-inset ring-[#28392f] hover:bg-[#28392f] hover:text-white focus:z-20 focus:outline-offset-0"
-                        href="#"
-                      >
-                        3
-                      </a>
-                      <span className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-[#9cbaa8] ring-1 ring-inset ring-[#28392f]">
-                        ...
-                      </span>
-                      <a
-                        className="relative inline-flex items-center px-4 py-2 text-sm font-semibold text-[#9cbaa8] ring-1 ring-inset ring-[#28392f] hover:bg-[#28392f] hover:text-white focus:z-20 focus:outline-offset-0"
-                        href="#"
-                      >
-                        8
-                      </a>
-                      <a
-                        className="relative inline-flex items-center rounded-r-lg px-2 py-2 text-[#9cbaa8] ring-1 ring-inset ring-[#28392f] hover:bg-[#28392f] hover:text-white focus:z-20 focus:outline-offset-0"
-                        href="#"
-                      >
-                        <span className="sr-only">Next</span>
-                        <span className="material-symbols-outlined text-[20px]">
-                          chevron_right
-                        </span>
-                      </a>
-                    </nav>
-                  </div>
-                </div>
 
-                {/* Mobile Pagination */}
-                <div className="flex items-center justify-between w-full sm:hidden">
-                  <a
-                    className="relative inline-flex items-center rounded-lg border border-[#28392f] bg-[#1d2d25] px-4 py-2 text-sm font-medium text-[#9cbaa8] hover:bg-[#28392f] hover:text-white"
-                    href="#"
-                  >
-                    Previous
-                  </a>
-                  <a
-                    className="relative inline-flex items-center rounded-lg border border-[#28392f] bg-[#1d2d25] px-4 py-2 text-sm font-medium text-[#9cbaa8] hover:bg-[#28392f] hover:text-white"
-                    href="#"
-                  >
-                    Next
-                  </a>
+                  {/* Mobile Pagination */}
+                  <div className="flex items-center justify-between w-full sm:hidden">
+                    <button
+                      onClick={() => handlePageChange(pagination.currentPage - 1)}
+                      disabled={!pagination.hasPrevPage}
+                      className="relative inline-flex items-center rounded-lg border border-[#28392f] bg-[#1d2d25] px-4 py-2 text-sm font-medium text-[#9cbaa8] hover:bg-[#28392f] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-sm text-[#9cbaa8]">
+                      Page {pagination.currentPage} of {pagination.totalPages}
+                    </span>
+                    <button
+                      onClick={() => handlePageChange(pagination.currentPage + 1)}
+                      disabled={!pagination.hasNextPage}
+                      className="relative inline-flex items-center rounded-lg border border-[#28392f] bg-[#1d2d25] px-4 py-2 text-sm font-medium text-[#9cbaa8] hover:bg-[#28392f] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </main>
       </div>
 
-      {/* Add User Modal */}
-      {isAddUserModalOpen && (
+      {/* Add/Edit User Modal */}
+      {isUserModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           {/* Backdrop */}
           <div
@@ -663,15 +715,17 @@ const AdminUsers = () => {
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-[#28392f]">
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center size-10 rounded-xl bg-primary/10">
-                  <span className="material-symbols-outlined text-primary">
-                    person_add
+                <div className={`flex items-center justify-center size-10 rounded-xl ${isEditMode ? 'bg-blue-500/10' : 'bg-primary/10'}`}>
+                  <span className={`material-symbols-outlined ${isEditMode ? 'text-blue-400' : 'text-primary'}`}>
+                    {isEditMode ? 'edit' : 'person_add'}
                   </span>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-white">Add New User</h2>
+                  <h2 className="text-xl font-bold text-white">
+                    {isEditMode ? 'Edit User' : 'Add New User'}
+                  </h2>
                   <p className="text-sm text-[#9cbaa8]">
-                    Create a new user account
+                    {isEditMode ? 'Update user account details' : 'Create a new user account'}
                   </p>
                 </div>
               </div>
@@ -785,7 +839,8 @@ const AdminUsers = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
-                      Password <span className="text-red-400">*</span>
+                      Password {!isEditMode && <span className="text-red-400">*</span>}
+                      {isEditMode && <span className="text-[#5a7063] text-xs ml-1">(leave blank to keep current)</span>}
                     </label>
                     <input
                       type="password"
@@ -797,7 +852,7 @@ const AdminUsers = () => {
                           ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
                           : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
                       }`}
-                      placeholder="Min 3 characters"
+                      placeholder={isEditMode ? "Enter new password" : "Min 3 characters"}
                     />
                     {fieldErrors.password && (
                       <p className="mt-1 text-xs text-red-400">
@@ -807,7 +862,7 @@ const AdminUsers = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
-                      Confirm Password <span className="text-red-400">*</span>
+                      Confirm Password {!isEditMode && <span className="text-red-400">*</span>}
                     </label>
                     <input
                       type="password"
@@ -832,7 +887,7 @@ const AdminUsers = () => {
                 {/* Mobile */}
                 <div>
                   <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
-                    Mobile Number
+                    Mobile Number <span className="text-red-400">*</span>
                   </label>
                   <input
                     type="tel"
@@ -858,13 +913,17 @@ const AdminUsers = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
-                      Branch
+                      Branch <span className="text-red-400">*</span>
                     </label>
                     <select
                       name="branch_id"
                       value={formData.branch_id}
                       onChange={handleInputChange}
-                      className="w-full h-11 px-4 rounded-xl bg-[#1d2d25] border border-[#28392f] text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all appearance-none cursor-pointer"
+                      className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white focus:outline-none focus:ring-1 transition-all appearance-none cursor-pointer ${
+                        fieldErrors.branch_id
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
+                          : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
+                      }`}
                     >
                       <option value="">Select Branch</option>
                       {branches.map((branch) => (
@@ -873,16 +932,25 @@ const AdminUsers = () => {
                         </option>
                       ))}
                     </select>
+                    {fieldErrors.branch_id && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {fieldErrors.branch_id}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
-                      Department
+                      Department <span className="text-red-400">*</span>
                     </label>
                     <select
                       name="department_id"
                       value={formData.department_id}
                       onChange={handleInputChange}
-                      className="w-full h-11 px-4 rounded-xl bg-[#1d2d25] border border-[#28392f] text-white focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all appearance-none cursor-pointer"
+                      className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white focus:outline-none focus:ring-1 transition-all appearance-none cursor-pointer ${
+                        fieldErrors.department_id
+                          ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
+                          : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
+                      }`}
                     >
                       <option value="">Select Department</option>
                       {departments.map((dept) => (
@@ -891,6 +959,11 @@ const AdminUsers = () => {
                         </option>
                       ))}
                     </select>
+                    {fieldErrors.department_id && (
+                      <p className="mt-1 text-xs text-red-400">
+                        {fieldErrors.department_id}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -907,7 +980,11 @@ const AdminUsers = () => {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-[#32d473] text-[#102217] font-bold transition-all shadow-[0_0_15px_rgba(61,245,135,0.2)] hover:shadow-[0_0_20px_rgba(61,245,135,0.4)] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isEditMode 
+                      ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-[0_0_15px_rgba(59,130,246,0.2)] hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]'
+                      : 'bg-primary hover:bg-[#32d473] text-[#102217] shadow-[0_0_15px_rgba(61,245,135,0.2)] hover:shadow-[0_0_20px_rgba(61,245,135,0.4)]'
+                  }`}
                 >
                   {isSubmitting ? (
                     <>
@@ -927,14 +1004,14 @@ const AdminUsers = () => {
                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                         />
                       </svg>
-                      <span>Creating...</span>
+                      <span>{isEditMode ? 'Updating...' : 'Creating...'}</span>
                     </>
                   ) : (
                     <>
                       <span className="material-symbols-outlined text-[20px]">
-                        person_add
+                        {isEditMode ? 'save' : 'person_add'}
                       </span>
-                      <span>Create User</span>
+                      <span>{isEditMode ? 'Save Changes' : 'Create User'}</span>
                     </>
                   )}
                 </button>

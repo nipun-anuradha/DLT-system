@@ -159,7 +159,8 @@ const getTicketById = async (req, res, next) => {
           model: Message,
           as: 'messages',
           include: [
-            { model: User, as: 'sender', attributes: ['id', 'name'] }
+            { model: User, as: 'userSender', attributes: ['id', 'name'] },
+            { model: Admin, as: 'adminSender', attributes: ['id', 'username'] }
           ]
         },
         {
@@ -171,7 +172,8 @@ const getTicketById = async (req, res, next) => {
             { model: Department, as: 'department', attributes: ['id', 'name'] }
           ]
         }
-      ]
+      ],
+      order: [[{ model: Message, as: 'messages' }, 'createdAt', 'ASC']]
     });
 
     if (!ticket) {
@@ -250,14 +252,38 @@ const addAdminMessage = async (req, res, next) => {
       });
     }
 
+    // Check if ticket is closed - prevent new messages
+    if (ticket.status === 'close') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot add messages to a closed ticket'
+      });
+    }
+
+    // Check if this is the first admin message - change status to inprogress
+    if (ticket.status === 'open') {
+      const existingAdminMessages = await Message.count({
+        where: {
+          ticket_id: ticket.id,
+          sender_type: 'admin'
+        }
+      });
+
+      if (existingAdminMessages === 0) {
+        ticket.status = 'inprogress';
+        await ticket.save();
+      }
+    }
+
     const createdMessages = [];
 
-    // Create text message if provided (admin messages have null user_id)
+    // Create text message if provided
     if (message) {
       const textMessage = await Message.create({
-        messagae: message,
         ticket_id: ticket.id,
-        user_id: null // null indicates admin message
+        sender_type: 'admin',
+        sender_id: admin_id,
+        message: message
       });
       createdMessages.push(textMessage);
     }
@@ -273,20 +299,32 @@ const addAdminMessage = async (req, res, next) => {
       }));
 
       const attachmentMessage = await Message.create({
-        messagae: JSON.stringify({
+        ticket_id: ticket.id,
+        sender_type: 'admin',
+        sender_id: admin_id,
+        message: JSON.stringify({
           type: 'attachment',
           files: attachmentPaths
-        }),
-        ticket_id: ticket.id,
-        user_id: null
+        })
       });
       createdMessages.push(attachmentMessage);
     }
 
+    // Fetch the created messages with sender info
+    const messageIds = createdMessages.map(m => m.id);
+    const fetchedMessages = await Message.findAll({
+      where: { id: messageIds },
+      include: [
+        { model: User, as: 'userSender', attributes: ['id', 'name'] },
+        { model: Admin, as: 'adminSender', attributes: ['id', 'username'] }
+      ]
+    });
+
     res.status(201).json({
       success: true,
       message: 'Reply added successfully',
-      data: createdMessages
+      data: fetchedMessages,
+      ticketStatus: ticket.status
     });
   } catch (error) {
     next(error);

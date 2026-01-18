@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Sidebar from '../components/layout/Sidebar';
+import { usePolling } from '../hooks';
 import api from '../utils/api';
 
 const Tickets = () => {
@@ -54,28 +55,30 @@ const Tickets = () => {
   ]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch dashboard counts on mount
-  useEffect(() => {
-    const fetchDashboardCounts = async () => {
-      try {
-        const response = await api.get('/user/tickets/dashboard/counts');
-        if (response.success) {
-          const { total, open, inprogress, closed } = response.data;
-          setStats(prevStats => prevStats.map(stat => ({
-            ...stat,
-            value: String(response.data[stat.key] || 0),
-            trend: response.data[stat.key] > 0 ? 'up' : 'flat',
-          })));
-        }
-      } catch (error) {
-        console.error('Failed to fetch dashboard counts:', error);
-      } finally {
-        setLoading(false);
+  // Fetch dashboard counts
+  const fetchDashboardCounts = useCallback(async () => {
+    try {
+      const response = await api.get('/user/tickets/dashboard/counts');
+      if (response.success) {
+        setStats(prevStats => prevStats.map(stat => ({
+          ...stat,
+          value: String(response.data[stat.key] || 0),
+          trend: response.data[stat.key] > 0 ? 'up' : 'flat',
+        })));
       }
-    };
-
-    fetchDashboardCounts();
+    } catch (error) {
+      console.error('Failed to fetch dashboard counts:', error);
+    }
   }, []);
+
+  // Initial fetch for dashboard counts
+  useEffect(() => {
+    const init = async () => {
+      await fetchDashboardCounts();
+      setLoading(false);
+    };
+    init();
+  }, [fetchDashboardCounts]);
 
   // Fetch tickets with filters and pagination
   const fetchTickets = useCallback(async (page = 1) => {
@@ -106,6 +109,14 @@ const Tickets = () => {
       setTicketsLoading(false);
     }
   }, [activeFilter, statusFilter, searchQuery]);
+
+  // Poll for updates every 30 seconds
+  const fetchAllData = useCallback(() => {
+    fetchDashboardCounts();
+    fetchTickets(pagination.currentPage);
+  }, [fetchDashboardCounts, fetchTickets, pagination.currentPage]);
+
+  usePolling(fetchAllData, 30000);
 
   // Fetch tickets when filters change
   useEffect(() => {

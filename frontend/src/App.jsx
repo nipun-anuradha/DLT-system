@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
-import ProtectedRoute from './components/common/ProtectedRoute'
+import { ProtectedRoute, AdminProtectedRoute } from './components/common'
 import Dashboard from './pages/Dashboard'
 import Tickets from './pages/Tickets'
 import NewTicket from './pages/NewTicket'
@@ -47,11 +47,31 @@ function App() {
             
             {/* Admin Routes */}
             <Route path="/admin" element={<AdminLogin />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/tickets" element={<AdminTickets />} />
-            <Route path="/admin/tickets/:id" element={<AdminTicketDetail />} />
-            <Route path="/admin/users" element={<AdminUsers />} />
-            <Route path="/admin/notices" element={<AdminNotices />} />
+            <Route path="/admin/dashboard" element={
+              <AdminProtectedRoute>
+                <AdminDashboard />
+              </AdminProtectedRoute>
+            } />
+            <Route path="/admin/tickets" element={
+              <AdminProtectedRoute>
+                <AdminTickets />
+              </AdminProtectedRoute>
+            } />
+            <Route path="/admin/tickets/:id" element={
+              <AdminProtectedRoute>
+                <AdminTicketDetail />
+              </AdminProtectedRoute>
+            } />
+            <Route path="/admin/users" element={
+              <AdminProtectedRoute>
+                <AdminUsers />
+              </AdminProtectedRoute>
+            } />
+            <Route path="/admin/notices" element={
+              <AdminProtectedRoute>
+                <AdminNotices />
+              </AdminProtectedRoute>
+            } />
             
             {/* Redirect unknown routes to dashboard */}
             <Route path="*" element={<Navigate to="/" replace />} />
