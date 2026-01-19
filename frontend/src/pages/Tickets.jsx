@@ -236,7 +236,7 @@ const Tickets = () => {
     <div className="bg-background-light dark:bg-background-dark text-slate-900 dark:text-white font-display overflow-hidden h-screen flex">
       <Sidebar activePage="tickets" />
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
+      <main className="flex-1 flex flex-col h-full overflow-hidden relative pt-16 md:pt-0">
         {/* Header */}
         <header className="w-full bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-sm z-10 sticky top-0 px-6 py-5 lg:px-10 border-b border-transparent">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">

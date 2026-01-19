@@ -263,7 +263,7 @@ const Login = () => {
                 <input
                   autoComplete="username"
                   className="flex w-full min-w-0 resize-none overflow-hidden rounded-xl text-white focus:outline-0 focus:ring-2 focus:ring-primary/50 border border-input-border bg-input-bg focus:border-primary h-11 placeholder:text-[#9eb7a8]/50 pl-10 pr-4 text-sm font-normal leading-normal transition-all duration-200"
-                  placeholder="Enter your username"
+                  placeholder="user@dlt.lk"
                   type="text"
                   name="username"
                   value={formData.username}
@@ -454,7 +454,7 @@ const Login = () => {
                     value={registerFormData.username}
                     onChange={handleRegisterChange}
                     className={`w-full h-10 px-3 rounded-xl bg-[#1d2d25] border text-white text-sm placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${registerFieldErrors.username ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'border-[#28392f] focus:border-primary/50 focus:ring-primary/50'}`}
-                    placeholder="Choose a username"
+                    placeholder="user@dlt.lk"
                   />
                   {registerFieldErrors.username && <p className="mt-1 text-xs text-red-400">{registerFieldErrors.username}</p>}
                 </div>

@@ -362,9 +362,9 @@ const TicketDetail = () => {
 
   return (
     <div className="bg-background-light dark:bg-background-dark font-display h-screen flex overflow-hidden">
-      <Sidebar activePage="tickets" isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      <Sidebar activePage="tickets" />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden pt-16 md:pt-0">
         {/* Top Ticket Header */}
         <header className="shrink-0 h-18 bg-white dark:bg-[#16231d] border-b dark:border-[#29382f] flex items-center justify-between px-4 py-3 shadow-sm z-20">
           <div className="flex items-center gap-4 overflow-hidden">

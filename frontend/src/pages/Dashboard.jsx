@@ -8,7 +8,7 @@ import api from '../utils/api';
 const Dashboard = () => {
   const { user } = useAuth();
   const firstName = user?.name?.split(' ')[0] || 'User';
-  const [openTicketCount, setOpenTicketCount] = useState(0);
+  const [TicketCount, setTicketCount] = useState(0);
   const [notices, setNotices] = useState([]);
   const [noticesLoading, setNoticesLoading] = useState(true);
 
@@ -19,7 +19,8 @@ const Dashboard = () => {
         // Fetch dashboard counts
         const countsResponse = await api.get('/user/tickets/dashboard/counts');
         if (countsResponse.success) {
-          setOpenTicketCount(countsResponse.data.open || 0);
+          const tickets = (countsResponse.data.open || 0) + (countsResponse.data.inprogress || 0);
+          setTicketCount(tickets);
         }
 
         // Fetch system notices
@@ -54,7 +55,7 @@ const modules = [
     status: 'active',
     badge: {
       icon: 'warning',
-      text: `${openTicketCount} Open Ticket${openTicketCount !== 1 ? 's' : ''}`,
+      text: `${TicketCount} Open Ticket${TicketCount !== 1 ? 's' : ''}`,
       color: 'yellow'
     },
     action: {

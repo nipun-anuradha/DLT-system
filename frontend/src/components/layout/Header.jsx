@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../utils/api';
 import dltLogo from '../../assets/dlt-logo.png';
 
 const Header = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [hasNotifications, setHasNotifications] = useState(false);
   const dropdownRef = useRef(null);
   const timeoutRef = useRef(null);
 
@@ -31,6 +33,24 @@ const Header = () => {
     };
   }, []);
 
+  // Fetch notifications count
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await api.get('/user/notices?limit=1');
+        if (response.success && response.data.length > 0) {
+          setHasNotifications(true);
+        } else {
+          setHasNotifications(false);
+        }
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error);
+      }
+    };
+
+    fetchNotifications();
+  }, []);
+
   return (
     <header className="w-full border-b border-[#29382f] bg-background-light dark:bg-background-dark px-4 sm:px-10 py-4 sticky top-0 z-50">
       <div className="max-w-[1440px] mx-auto flex items-center justify-between">
@@ -44,7 +64,9 @@ const Header = () => {
           {/* Notifications */}
           <button className="relative p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-slate-600 dark:text-slate-300">
             <span className="material-symbols-outlined text-[24px]">notifications</span>
-            <span className="absolute top-2 right-2 size-2.5 bg-primary rounded-full border-2 border-background-light dark:border-background-dark"></span>
+            {hasNotifications && (
+              <span className="absolute top-2 right-2 size-2.5 bg-primary rounded-full border-2 border-background-light dark:border-background-dark"></span>
+            )}
           </button>
 
           {/* Profile Dropdown */}

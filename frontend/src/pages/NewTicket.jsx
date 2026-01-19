@@ -112,7 +112,7 @@ const NewTicket = () => {
     <div className="font-display bg-background-light dark:bg-background-dark text-slate-900 dark:text-white overflow-hidden h-screen flex">
       <Sidebar activePage="tickets" />
 
-      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative pt-16 md:pt-0">
         {/* Top Navigation Bar */}
         <header className="flex items-center justify-between border-b border-[#29382f] bg-[#111714]/90 backdrop-blur-sm px-6 py-4 sticky top-0 z-20">
           <div className="flex items-center gap-4">

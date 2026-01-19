@@ -72,36 +72,36 @@ const AdminLogin = () => {
 
       {/* Main Content */}
       <main className="relative z-10 flex-grow flex items-center justify-center p-4">
-        <div className="w-full max-w-[480px]">
+        <div className="w-full max-w-[380px]">
           {/* Login Card */}
-          <div className="glass-panel rounded-2xl p-8 sm:p-10 flex flex-col gap-6">
+          <div className="glass-panel rounded-xl p-6 sm:p-8 flex flex-col gap-4">
             {/* Header Section */}
-            <div className="flex flex-col items-center text-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-surface-dark border border-white/5 flex items-center justify-center shadow-lg shadow-black/20 mb-2 group">
-                <span className="material-symbols-outlined text-primary text-[32px] group-hover:scale-110 transition-transform duration-300">
+            <div className="flex flex-col items-center text-center gap-2">
+              <div className="w-12 h-12 rounded-full bg-surface-dark border border-white/5 flex items-center justify-center shadow-lg shadow-black/20 group">
+                <span className="material-symbols-outlined text-primary text-[24px] group-hover:scale-110 transition-transform duration-300">
                   admin_panel_settings
                 </span>
               </div>
               <div>
-                <h1 className="text-2xl font-bold tracking-tight text-white mb-2">Admin System Access</h1>
-                <p className="text-slate-400 text-sm leading-relaxed max-w-[300px] mx-auto">
-                  Enter credentials to access the IT Support Module
+                <h1 className="text-xl font-bold tracking-tight text-white mb-1">Admin Access</h1>
+                <p className="text-slate-400 text-xs leading-relaxed">
+                  Enter credentials to access the system
                 </p>
               </div>
             </div>
 
             {/* Form Section */}
-            <form className="flex flex-col gap-5 mt-2" onSubmit={handleSubmit}>
+            <form className="flex flex-col gap-4 mt-1" onSubmit={handleSubmit}>
               {/* Admin ID Input */}
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <label
                   className="block text-xs font-medium text-primary/80 uppercase tracking-wider ml-1"
                   htmlFor="username"
                 >
-                  Admin Username
+                  Username
                 </label>
-                <div className="input-dark rounded-lg flex items-center px-4 h-12">
-                  <span className="material-symbols-outlined text-slate-500 mr-3 text-[20px]">badge</span>
+                <div className="input-dark rounded-lg flex items-center px-3 h-10">
+                  <span className="material-symbols-outlined text-slate-500 mr-2 text-[18px]">badge</span>
                   <input
                     className="bg-transparent border-none p-0 text-sm w-full focus:ring-0 placeholder:text-slate-600 text-white font-medium"
                     id="username"
@@ -115,15 +115,15 @@ const AdminLogin = () => {
               </div>
 
               {/* Password Input */}
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <label
                   className="block text-xs font-medium text-primary/80 uppercase tracking-wider ml-1"
                   htmlFor="password"
                 >
                   Password
                 </label>
-                <div className="input-dark rounded-lg flex items-center px-4 h-12 relative group">
-                  <span className="material-symbols-outlined text-slate-500 mr-3 text-[20px]">key</span>
+                <div className="input-dark rounded-lg flex items-center px-3 h-10 relative group">
+                  <span className="material-symbols-outlined text-slate-500 mr-2 text-[18px]">key</span>
                   <input
                     className="bg-transparent border-none p-0 text-sm w-full focus:ring-0 placeholder:text-slate-600 text-white font-medium pr-8"
                     id="password"
@@ -139,7 +139,7 @@ const AdminLogin = () => {
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={loading}
                   >
-                    <span className="material-symbols-outlined text-[20px]">
+                    <span className="material-symbols-outlined text-[18px]">
                       {showPassword ? 'visibility_off' : 'visibility'}
                     </span>
                   </button>
@@ -148,26 +148,26 @@ const AdminLogin = () => {
 
               {/* Error Message */}
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 flex items-center gap-3">
-                  <span className="material-symbols-outlined text-red-400 text-[20px]">error</span>
+                <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2.5 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-red-400 text-[18px]">error</span>
                   <p className="text-red-400 text-xs font-medium">{error}</p>
                 </div>
               )}
 
               {/* Login Button */}
               <button
-                className="mt-4 w-full h-12 bg-primary text-background-dark font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-[#00ff66] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#102217] focus:ring-primary active:scale-[0.98] transition-all shadow-lg shadow-primary/30 hover:shadow-primary/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary"
+                className="mt-2 w-full h-10 bg-primary text-background-dark font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-[#00ff66] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#102217] focus:ring-primary active:scale-[0.98] transition-all shadow-lg shadow-primary/30 hover:shadow-primary/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary text-sm"
                 type="submit"
                 disabled={loading || !formData.username || !formData.password}
               >
                 {loading ? (
                   <>
-                    <span className="material-symbols-outlined text-[20px] animate-spin">progress_activity</span>
+                    <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
                     Authenticating...
                   </>
                 ) : (
                   <>
-                    <span className="material-symbols-outlined text-[20px]">lock_open</span>
+                    <span className="material-symbols-outlined text-[18px]">lock_open</span>
                     Secure Login
                   </>
                 )}
@@ -175,19 +175,17 @@ const AdminLogin = () => {
             </form>
 
             {/* Footer / Disclaimer */}
-            <div className="pt-4 border-t border-white/5 text-center">
-              <div className="flex flex-col gap-2 items-center">
-                <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                  <span className="material-symbols-outlined text-[14px]">encrypted</span>
-                  <span>Restricted Area. Authorized Admins Only.</span>
-                </div>
+            <div className="pt-3 border-t border-white/5 text-center">
+              <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
+                <span className="material-symbols-outlined text-[14px]">encrypted</span>
+                <span>Authorized Admins Only</span>
               </div>
             </div>
           </div>
 
           {/* Bottom Link */}
-          <div className="text-center mt-6">
-            <a className="text-sm text-slate-500 hover:text-primary transition-colors duration-200" href="#">
+          <div className="text-center mt-4">
+            <a className="text-xs text-slate-500 hover:text-primary transition-colors duration-200" href="#">
               Forgot Administrator Password?
             </a>
           </div>
