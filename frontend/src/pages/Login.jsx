@@ -57,6 +57,7 @@ const Login = () => {
 
   // Registration modal state
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [isContactModalOpen, setIsContactModalOpen] = useState(false);
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [showRegConfirmPassword, setShowRegConfirmPassword] = useState(false);
   const [registerLoading, setRegisterLoading] = useState(false);
@@ -346,7 +347,14 @@ const Login = () => {
               </button>
             </p>
             <p className="text-[#9eb7a8] text-xs">
-              Having trouble? <a className="text-white font-medium hover:text-primary transition-colors" href="#">Contact IT Support</a>
+              Having trouble?{' '}
+              <button 
+                type="button"
+                onClick={() => setIsContactModalOpen(true)}
+                className="text-white font-medium hover:text-primary transition-colors"
+              >
+                Contact IT Support
+              </button>
             </p>
           </div>
 
@@ -361,6 +369,87 @@ const Login = () => {
           </p>
         </div>
       </div>
+
+      {/* Contact IT Support Modal */}
+      {isContactModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setIsContactModalOpen(false)}
+          ></div>
+          
+          {/* Modal Content */}
+          <div className="relative bg-surface-dark border border-[#28392f] rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-fade-in-up">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-5 border-b border-[#28392f]">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center size-10 rounded-xl bg-primary/10">
+                  <span className="material-symbols-outlined text-primary">support_agent</span>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white">IT Support</h2>
+                  <p className="text-xs text-[#9cbaa8]">Contact Information</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsContactModalOpen(false)}
+                className="p-2 text-[#9cbaa8] hover:text-white hover:bg-[#28392f] rounded-lg transition-colors"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-5">
+              {/* IT Department Section */}
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wide mb-3">
+                  IT Department – Dutch Lanka Trailers (Pvt) Ltd
+                </h3>
+                <div className="space-y-2">
+                  <a href="mailto:mahanama@dlt.lk" className="flex items-center gap-2 text-[#9cbaa8] hover:text-primary transition-colors text-sm">
+                    <span className="material-symbols-outlined text-base">mail</span>
+                    mahanama@dlt.lk
+                  </a>
+                  <a href="mailto:thanuja@dlt.lk" className="flex items-center gap-2 text-[#9cbaa8] hover:text-primary transition-colors text-sm">
+                    <span className="material-symbols-outlined text-base">mail</span>
+                    thanuja@dlt.lk
+                  </a>
+                  <a href="mailto:nipun.anuradha@dlt.lk" className="flex items-center gap-2 text-[#9cbaa8] hover:text-primary transition-colors text-sm">
+                    <span className="material-symbols-outlined text-base">mail</span>
+                    nipun.anuradha@dlt.lk
+                  </a>
+                </div>
+              </div>
+
+              {/* Issue Reporting Section */}
+              <div className="pt-4 border-t border-[#28392f]">
+                <h3 className="text-sm font-bold text-white uppercase tracking-wide mb-3">
+                  Issue Reporting
+                </h3>
+                <p className="text-[#9cbaa8] text-sm leading-relaxed mb-3">
+                  If you experience any system bugs, errors, or issues, please report them via email to the developer:
+                </p>
+                <a href="mailto:nipun.anuradha@dlt.lk" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary/10 border border-primary/20 text-primary font-medium text-sm hover:bg-primary/20 transition-colors">
+                  <span className="material-symbols-outlined text-base">bug_report</span>
+                  nipun.anuradha@dlt.lk
+                </a>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end p-5 border-t border-[#28392f]">
+              <button
+                onClick={() => setIsContactModalOpen(false)}
+                className="px-4 py-2 rounded-xl bg-primary hover:bg-[#32d473] text-[#102217] text-sm font-bold transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Registration Modal */}
       {isRegisterModalOpen && (
