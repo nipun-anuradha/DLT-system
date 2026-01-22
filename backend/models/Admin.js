@@ -20,19 +20,7 @@ const Admin = sequelize.define('Admin', {
   }
 }, {
   tableName: 'admin',
-  timestamps: true,
-  hooks: {
-    beforeCreate: async (admin) => {
-      if (admin.password) {
-        admin.password = await bcrypt.hash(admin.password, 10);
-      }
-    },
-    beforeUpdate: async (admin) => {
-      if (admin.changed('password')) {
-        admin.password = await bcrypt.hash(admin.password, 10);
-      }
-    }
-  }
+  timestamps: false
 });
 
 // Instance method to verify password

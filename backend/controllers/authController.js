@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { User, Admin, Branch, Department, Log } = require('../models/associations');
+const { User, Admin, Log } = require('../models/associations');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -10,66 +10,48 @@ const generateToken = (payload) => {
   });
 };
 
-// @desc    Register a new user
+// @desc    Register a new user (local registration)
 // @route   POST /api/auth/register
 // @access  Public
 const registerUser = async (req, res, next) => {
   try {
-    const { name, emp_no, username, password, mobile, branch_id, department_id } = req.body;
+    const { name, username, password, mobile, department, branch } = req.body;
 
-    // Validate all required fields
-    if (!name || !emp_no || !username || !password || !mobile || !branch_id || !department_id) {
+    // Validate required fields - only username and password required for local registration
+    if (!username || !password) {
       return res.status(400).json({
         success: false,
-        message: 'All fields are required: name, emp_no, username, password, mobile, branch_id, department_id'
+        message: 'Username (email) and password are required'
       });
     }
 
-    // Validate branch_id exists in database
-    const branch = await Branch.findByPk(branch_id);
-    if (!branch) {
+    // Validate email format for username
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(username)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid branch_id. Branch does not exist'
+        message: 'Username must be a valid email address'
       });
     }
 
-    // Validate department_id exists in database
-    const department = await Department.findByPk(department_id);
-    if (!department) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid department_id. Department does not exist'
-      });
-    }
-
-    // Check if username already exists
-    const existingUser = await User.findOne({ where: { username } });
+    // Check if username (email) already exists
+    const existingUser = await User.findOne({ where: { username: username.toLowerCase() } });
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'Username already exists'
-      });
-    }
-
-    // Check if emp_no already exists
-    const existingEmpNo = await User.findOne({ where: { emp_no } });
-    if (existingEmpNo) {
-      return res.status(400).json({
-        success: false,
-        message: 'Employee number already exists'
+        message: 'This email is already registered'
       });
     }
 
     // Create new user (password will be hashed by hook)
     const user = await User.create({
-      name,
-      emp_no,
-      username,
+      name: name || null,
+      username: username.toLowerCase(),
       password,
-      mobile,
-      branch_id,
-      department_id
+      mobile: mobile || null,
+      department: department || null,
+      branch: branch || null,
+      auth_provider: 'local'
     });
 
     res.status(201).json({
@@ -78,11 +60,10 @@ const registerUser = async (req, res, next) => {
       data: {
         id: user.id,
         name: user.name,
-        emp_no: user.emp_no,
         username: user.username,
         mobile: user.mobile,
-        branch_id: user.branch_id,
-        department_id: user.department_id
+        department: user.department,
+        branch: user.branch
       }
     });
   } catch (error) {
@@ -90,26 +71,30 @@ const registerUser = async (req, res, next) => {
   }
 };
 
-// @desc    Login user
+// @desc    Login user (local login with password)
 // @route   POST /api/auth/login
 // @access  Public
 const loginUser = async (req, res, next) => {
   try {
     const { username, password } = req.body;
 
-    // Find user by username with associations
+    // Find user by username (email)
     const user = await User.findOne({
-      where: { username },
-      include: [
-        { model: Branch, as: 'branch', attributes: ['id', 'name'] },
-        { model: Department, as: 'department', attributes: ['id', 'name'] }
-      ]
+      where: { username: username.toLowerCase() }
     });
 
     if (!user) {
       return res.status(401).json({
         success: false,
         message: 'Invalid username or password'
+      });
+    }
+
+    // Check if user has password (MS-only users don't have password)
+    if (!user.password) {
+      return res.status(401).json({
+        success: false,
+        message: 'This account uses Microsoft Sign-In. Please use the Microsoft button to login.'
       });
     }
 
@@ -140,6 +125,98 @@ const loginUser = async (req, res, next) => {
     res.json({
       success: true,
       message: 'Login successful',
+      data: userData,
+      token
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Microsoft Sign-In - Register or Login
+// @route   POST /api/auth/microsoft
+// @access  Public
+const microsoftAuth = async (req, res, next) => {
+  try {
+    const { 
+      microsoftId,
+      email, 
+      displayName, 
+      department, 
+      mobilePhone,
+      city // Will be used as branch/city
+    } = req.body;
+
+    // Validate required fields
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required from Microsoft account'
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase();
+
+    // Check if user exists by Microsoft ID first
+    let user = await User.findByMicrosoftId(microsoftId);
+    
+    // If not found by MS ID, check by email
+    if (!user) {
+      user = await User.findByUsername(normalizedEmail);
+    }
+
+    let isNewUser = false;
+
+    if (user) {
+      // Existing user - update Microsoft ID if not set
+      if (!user.microsoft_id && microsoftId) {
+        user.microsoft_id = microsoftId;
+        user.auth_provider = 'microsoft';
+        await user.save();
+      }
+      
+      // Optionally update user info from Microsoft
+      // (only update if fields are null to not override manual edits)
+      if (!user.name && displayName) user.name = displayName;
+      if (!user.department && department) user.department = department;
+      if (!user.mobile && mobilePhone) user.mobile = mobilePhone;
+      if (!user.branch && city) user.branch = city;
+      await user.save();
+      
+    } else {
+      // New user - create account with Microsoft data
+      isNewUser = true;
+      user = await User.create({
+        name: displayName || null,
+        username: normalizedEmail,
+        password: null, // No password for MS-only users
+        mobile: mobilePhone || null,
+        department: department || null,
+        branch: city || null,
+        microsoft_id: microsoftId,
+        auth_provider: 'microsoft'
+      });
+    }
+
+    // Generate token
+    const token = generateToken({
+      id: user.id,
+      username: user.username,
+      role: 'user'
+    });
+
+    // Log the login
+    const ip = req.ip || req.connection.remoteAddress;
+    await Log.create({ ip, user_id: user.id });
+
+    // Prepare response data (exclude password)
+    const userData = user.toJSON();
+    delete userData.password;
+
+    res.json({
+      success: true,
+      message: isNewUser ? 'Account created and logged in successfully' : 'Login successful',
+      isNewUser,
       data: userData,
       token
     });
@@ -198,42 +275,9 @@ const loginAdmin = async (req, res, next) => {
   }
 };
 
-// Get public branches for registration
-const getPublicBranches = async (req, res, next) => {
-  try {
-    const branches = await Branch.findAll({
-      attributes: ['id', 'name'],
-      order: [['name', 'ASC']]
-    });
-    res.json({
-      success: true,
-      data: branches
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// Get public departments for registration
-const getPublicDepartments = async (req, res, next) => {
-  try {
-    const departments = await Department.findAll({
-      attributes: ['id', 'name'],
-      order: [['name', 'ASC']]
-    });
-    res.json({
-      success: true,
-      data: departments
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   registerUser,
   loginUser,
+  microsoftAuth,
   loginAdmin,
-  getPublicBranches,
-  getPublicDepartments,
 };

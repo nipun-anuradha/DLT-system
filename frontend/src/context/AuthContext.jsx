@@ -56,6 +56,8 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
     localStorage.removeItem(STORAGE_KEYS.USER_DATA);
     localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    // Set flag to prevent Microsoft auto-login on Login page
+    sessionStorage.setItem('just_logged_out', 'true');
   };
 
   // Admin Logout function

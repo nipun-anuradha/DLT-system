@@ -12,13 +12,8 @@ const Log = require('./Log');
 
 // Define Associations
 
-// Branch - User
-Branch.hasMany(User, { foreignKey: 'branch_id', as: 'users' });
-User.belongsTo(Branch, { foreignKey: 'branch_id', as: 'branch' });
-
-// Department - User
-Department.hasMany(User, { foreignKey: 'department_id', as: 'users' });
-User.belongsTo(Department, { foreignKey: 'department_id', as: 'department' });
+// Note: Branch and Department are no longer linked to User
+// User now has department and branch as string fields
 
 // User - Ticket
 User.hasMany(Ticket, { foreignKey: 'user_id', as: 'tickets' });

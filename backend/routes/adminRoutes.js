@@ -23,10 +23,7 @@ const {
   createNotice,
   updateNotice,
   publishNotice,
-  deleteNotice,
-  // Lookup
-  getBranches,
-  getDepartments
+  deleteNotice
 } = require('../controllers/adminController');
 
 // All routes require admin authentication
@@ -56,9 +53,5 @@ router.post('/notices', createNotice);
 router.put('/notices/:id', updateNotice);
 router.put('/notices/:id/publish', publishNotice);
 router.delete('/notices/:id', deleteNotice);
-
-// ==================== LOOKUP DATA ====================
-router.get('/branches', getBranches);
-router.get('/departments', getDepartments);
 
 module.exports = router;

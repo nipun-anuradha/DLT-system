@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Ticket, Message, User, Admin, Branch, Department, Notice } = require('../models/associations');
+const { Ticket, Message, User, Admin, Notice } = require('../models/associations');
 
 // ==================== DASHBOARD ====================
 
@@ -49,7 +49,7 @@ const getRecentTickets = async (req, res, next) => {
         {
           model: User,
           as: 'user',
-          attributes: ['id', 'name', 'emp_no']
+          attributes: ['id', 'name', 'username']
         }
       ],
       order: [['date', 'DESC']],
@@ -115,11 +115,7 @@ const getAllTickets = async (req, res, next) => {
         {
           model: User,
           as: 'user',
-          attributes: ['id', 'name', 'emp_no'],
-          include: [
-            { model: Branch, as: 'branch', attributes: ['id', 'name'] },
-            { model: Department, as: 'department', attributes: ['id', 'name'] }
-          ]
+          attributes: ['id', 'name', 'username', 'department', 'branch']
         }
       ],
       order: [['date', 'DESC']],
@@ -166,11 +162,7 @@ const getTicketById = async (req, res, next) => {
         {
           model: User,
           as: 'user',
-          attributes: ['id', 'name', 'emp_no', 'mobile'],
-          include: [
-            { model: Branch, as: 'branch', attributes: ['id', 'name'] },
-            { model: Department, as: 'department', attributes: ['id', 'name'] }
-          ]
+          attributes: ['id', 'name', 'username', 'mobile', 'department', 'branch']
         }
       ],
       order: [[{ model: Message, as: 'messages' }, 'createdAt', 'ASC']]
@@ -342,8 +334,8 @@ const getAllUsers = async (req, res, next) => {
       page = 1,
       limit = 10,
       search = '',
-      branch_id = '',
-      department_id = ''
+      branch = '',
+      department = ''
     } = req.query;
 
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -352,32 +344,29 @@ const getAllUsers = async (req, res, next) => {
     const whereClause = {};
 
     // Filter by branch
-    if (branch_id && branch_id !== 'all') {
-      whereClause.branch_id = branch_id;
+    if (branch && branch !== 'all') {
+      whereClause.branch = { [Op.like]: `%${branch}%` };
     }
 
     // Filter by department
-    if (department_id && department_id !== 'all') {
-      whereClause.department_id = department_id;
+    if (department && department !== 'all') {
+      whereClause.department = { [Op.like]: `%${department}%` };
     }
 
-    // Search by name, emp_no, username
+    // Search by name, username, mobile, department, branch
     if (search) {
       whereClause[Op.or] = [
         { name: { [Op.like]: `%${search}%` } },
-        { emp_no: { [Op.like]: `%${search}%` } },
         { username: { [Op.like]: `%${search}%` } },
-        { mobile: { [Op.like]: `%${search}%` } }
+        { mobile: { [Op.like]: `%${search}%` } },
+        { department: { [Op.like]: `%${search}%` } },
+        { branch: { [Op.like]: `%${search}%` } }
       ];
     }
 
     const { count, rows: users } = await User.findAndCountAll({
       where: whereClause,
       attributes: { exclude: ['password'] },
-      include: [
-        { model: Branch, as: 'branch', attributes: ['id', 'name'] },
-        { model: Department, as: 'department', attributes: ['id', 'name'] }
-      ],
       order: [['id', 'DESC']],
       limit: parseInt(limit),
       offset
@@ -412,8 +401,6 @@ const getUserById = async (req, res, next) => {
     const user = await User.findByPk(id, {
       attributes: { exclude: ['password'] },
       include: [
-        { model: Branch, as: 'branch', attributes: ['id', 'name'] },
-        { model: Department, as: 'department', attributes: ['id', 'name'] },
         {
           model: Ticket,
           as: 'tickets',
@@ -444,45 +431,43 @@ const getUserById = async (req, res, next) => {
 // @access  Private (Admin)
 const createUser = async (req, res, next) => {
   try {
-    const { name, emp_no, username, password, mobile, branch_id, department_id } = req.body;
+    const { name, username, password, mobile, department, branch } = req.body;
 
     // Validate required fields
-    if (!name || !username || !password) {
+    if (!username || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Name, username and password are required'
+        message: 'Email (username) and password are required'
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(username)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username must be a valid email address'
       });
     }
 
     // Check if username already exists
-    const existingUser = await User.findOne({ where: { username } });
+    const existingUser = await User.findOne({ where: { username: username.toLowerCase() } });
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'Username already exists'
+        message: 'Email already exists'
       });
-    }
-
-    // Check if emp_no already exists
-    if (emp_no) {
-      const existingEmpNo = await User.findOne({ where: { emp_no } });
-      if (existingEmpNo) {
-        return res.status(400).json({
-          success: false,
-          message: 'Employee number already exists'
-        });
-      }
     }
 
     // Create user
     const user = await User.create({
-      name,
-      emp_no,
-      username,
+      name: name || null,
+      username: username.toLowerCase(),
       password,
-      mobile,
-      branch_id,
-      department_id
+      mobile: mobile || null,
+      department: department || null,
+      branch: branch || null,
+      auth_provider: 'local'
     });
 
     // Return user without password
@@ -505,7 +490,7 @@ const createUser = async (req, res, next) => {
 const updateUser = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, emp_no, username, password, mobile, branch_id, department_id } = req.body;
+    const { name, username, password, mobile, department, branch } = req.body;
 
     const user = await User.findByPk(id);
 
@@ -517,35 +502,23 @@ const updateUser = async (req, res, next) => {
     }
 
     // Check if username is being changed and already exists
-    if (username && username !== user.username) {
-      const existingUser = await User.findOne({ where: { username } });
+    if (username && username.toLowerCase() !== user.username) {
+      const existingUser = await User.findOne({ where: { username: username.toLowerCase() } });
       if (existingUser) {
         return res.status(400).json({
           success: false,
-          message: 'Username already exists'
-        });
-      }
-    }
-
-    // Check if emp_no is being changed and already exists
-    if (emp_no && emp_no !== user.emp_no) {
-      const existingEmpNo = await User.findOne({ where: { emp_no } });
-      if (existingEmpNo) {
-        return res.status(400).json({
-          success: false,
-          message: 'Employee number already exists'
+          message: 'Email already exists'
         });
       }
     }
 
     // Update fields
-    if (name) user.name = name;
-    if (emp_no) user.emp_no = emp_no;
-    if (username) user.username = username;
+    if (name !== undefined) user.name = name;
+    if (username) user.username = username.toLowerCase();
     if (password) user.password = password; // Will be hashed by hook
     if (mobile !== undefined) user.mobile = mobile;
-    if (branch_id !== undefined) user.branch_id = branch_id;
-    if (department_id !== undefined) user.department_id = department_id;
+    if (department !== undefined) user.department = department;
+    if (branch !== undefined) user.branch = branch;
 
     await user.save();
 
@@ -802,46 +775,6 @@ const deleteNotice = async (req, res, next) => {
   }
 };
 
-// ==================== LOOKUP DATA ====================
-
-// @desc    Get all branches
-// @route   GET /api/admin/branches
-// @access  Private (Admin)
-const getBranches = async (req, res, next) => {
-  try {
-    const branches = await Branch.findAll({
-      attributes: ['id', 'name'],
-      order: [['name', 'ASC']]
-    });
-
-    res.json({
-      success: true,
-      data: branches
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Get all departments
-// @route   GET /api/admin/departments
-// @access  Private (Admin)
-const getDepartments = async (req, res, next) => {
-  try {
-    const departments = await Department.findAll({
-      attributes: ['id', 'name'],
-      order: [['name', 'ASC']]
-    });
-
-    res.json({
-      success: true,
-      data: departments
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 module.exports = {
   // Dashboard
   getDashboardCounts,
@@ -863,8 +796,5 @@ module.exports = {
   createNotice,
   updateNotice,
   publishNotice,
-  deleteNotice,
-  // Lookup
-  getBranches,
-  getDepartments
+  deleteNotice
 };

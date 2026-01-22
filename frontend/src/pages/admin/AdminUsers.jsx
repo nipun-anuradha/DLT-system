@@ -7,17 +7,12 @@ import { useAuth } from "../../context";
 // Validation schema for creating user
 const createUserValidationSchema = Yup.object().shape({
   name: Yup.string()
-    .required("Full name is required")
-    .min(2, "Name must be at least 2 characters")
-    .max(100, "Name must not exceed 100 characters"),
-  emp_no: Yup.string()
-    .required("Employee number is required")
-    .max(45, "Employee number must not exceed 45 characters")
+    .max(100, "Name must not exceed 100 characters")
     .nullable(),
   username: Yup.string()
-    .required("Username is required")
-    .min(3, "Username must be at least 3 characters")
-    .max(100, "Username must not exceed 100 characters"),
+    .required("Email is required")
+    .email("Must be a valid email address")
+    .max(100, "Email must not exceed 100 characters"),
   password: Yup.string()
     .required("Password is required")
     .min(3, "Password must be at least 3 characters"),
@@ -25,29 +20,25 @@ const createUserValidationSchema = Yup.object().shape({
     .required("Please confirm your password")
     .oneOf([Yup.ref("password")], "Passwords must match"),
   mobile: Yup.string()
-    .required("Mobile number is required")
-    .matches(/^\d{10}$/, "Mobile number must be exactly 10 digits"),
-  branch_id: Yup.number()
-    .required("Branch is required")
-    .typeError("Branch is required"),
-  department_id: Yup.number()
-    .required("Department is required")
-    .typeError("Department is required"),
+    .matches(/^$|^\d{10}$/, "Mobile number must be exactly 10 digits")
+    .nullable(),
+  branch: Yup.string()
+    .max(100, "Branch must not exceed 100 characters")
+    .nullable(),
+  department: Yup.string()
+    .max(100, "Department must not exceed 100 characters")
+    .nullable(),
 });
 
 // Validation schema for editing user (password optional)
 const editUserValidationSchema = Yup.object().shape({
   name: Yup.string()
-    .required("Full name is required")
-    .min(2, "Name must be at least 2 characters")
-    .max(100, "Name must not exceed 100 characters"),
-  emp_no: Yup.string()
-    .max(45, "Employee number must not exceed 45 characters")
+    .max(100, "Name must not exceed 100 characters")
     .nullable(),
   username: Yup.string()
-    .required("Username is required")
-    .min(3, "Username must be at least 3 characters")
-    .max(100, "Username must not exceed 100 characters"),
+    .required("Email is required")
+    .email("Must be a valid email address")
+    .max(100, "Email must not exceed 100 characters"),
   password: Yup.string()
     .test("password-min", "Password must be at least 3 characters", function(value) {
       if (!value || value === "") return true;
@@ -62,8 +53,12 @@ const editUserValidationSchema = Yup.object().shape({
   mobile: Yup.string()
     .matches(/^$|^\d{10}$/, "Mobile number must be exactly 10 digits")
     .nullable(),
-  branch_id: Yup.number().nullable(),
-  department_id: Yup.number().nullable(),
+  branch: Yup.string()
+    .max(100, "Branch must not exceed 100 characters")
+    .nullable(),
+  department: Yup.string()
+    .max(100, "Department must not exceed 100 characters")
+    .nullable(),
 });
 
 const AdminUsers = () => {
@@ -78,10 +73,6 @@ const AdminUsers = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [formSuccess, setFormSuccess] = useState("");
-
-  // Lookup data
-  const [branches, setBranches] = useState([]);
-  const [departments, setDepartments] = useState([]);
 
   // Users data state
   const [users, setUsers] = useState([]);
@@ -99,13 +90,12 @@ const AdminUsers = () => {
   // Form state
   const [formData, setFormData] = useState({
     name: "",
-    emp_no: "",
     username: "",
     password: "",
     confirmPassword: "",
     mobile: "",
-    branch_id: "",
-    department_id: "",
+    branch: "",
+    department: "",
   });
 
   // Field-level errors
@@ -142,21 +132,8 @@ const AdminUsers = () => {
     }
   };
 
-  // Fetch branches and departments on mount
+  // Fetch users on mount
   useEffect(() => {
-    const fetchLookupData = async () => {
-      try {
-        const [branchesRes, departmentsRes] = await Promise.all([
-          apiRequest("/admin/branches"),
-          apiRequest("/admin/departments"),
-        ]);
-        setBranches(branchesRes.data || []);
-        setDepartments(departmentsRes.data || []);
-      } catch (error) {
-        console.error("Failed to fetch lookup data:", error);
-      }
-    };
-    fetchLookupData();
     fetchUsers();
   }, []);
 
@@ -209,13 +186,12 @@ const AdminUsers = () => {
   const resetForm = () => {
     setFormData({
       name: "",
-      emp_no: "",
       username: "",
       password: "",
       confirmPassword: "",
       mobile: "",
-      branch_id: "",
-      department_id: "",
+      branch: "",
+      department: "",
     });
     setFormError("");
     setFormSuccess("");
@@ -232,13 +208,12 @@ const AdminUsers = () => {
   const handleOpenEditModal = (user) => {
     setFormData({
       name: user.name || "",
-      emp_no: user.emp_no || "",
       username: user.username || "",
       password: "",
       confirmPassword: "",
       mobile: user.mobile || "",
-      branch_id: user.branch_id || "",
-      department_id: user.department_id || "",
+      branch: user.branch || "",
+      department: user.department || "",
     });
     setFormError("");
     setFormSuccess("");
@@ -285,14 +260,11 @@ const AdminUsers = () => {
 
     try {
       const payload = {
-        name: formData.name,
+        name: formData.name || null,
         username: formData.username,
-        emp_no: formData.emp_no || null,
         mobile: formData.mobile || null,
-        branch_id: formData.branch_id ? parseInt(formData.branch_id) : null,
-        department_id: formData.department_id
-          ? parseInt(formData.department_id)
-          : null,
+        branch: formData.branch || null,
+        department: formData.department || null,
       };
 
       // Only include password if it's provided (required for create, optional for edit)
@@ -459,7 +431,7 @@ const AdminUsers = () => {
                   </span>
                   <input
                     className="flex-1 bg-transparent text-white placeholder-[#5a7063] focus:outline-none text-base"
-                    placeholder="Search by Name, Username, Emp No or Mobile"
+                    placeholder="Search by Name, Email, Mobile, Branch or Department"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
@@ -491,11 +463,11 @@ const AdminUsers = () => {
                       </th>
                       <th className="p-4 border-b border-[#28392f]">ID</th>
                       <th className="p-4 border-b border-[#28392f]">Name</th>
-                      <th className="p-4 border-b border-[#28392f]">Username</th>
-                      <th className="p-4 border-b border-[#28392f]">Emp No</th>
+                      <th className="p-4 border-b border-[#28392f]">Email</th>
                       <th className="p-4 border-b border-[#28392f]">Mobile</th>
                       <th className="p-4 border-b border-[#28392f]">Branch</th>
                       <th className="p-4 border-b border-[#28392f]">Department</th>
+                      <th className="p-4 border-b border-[#28392f]">Auth</th>
                       <th className="p-4 border-b border-[#28392f] text-right">
                         Actions
                       </th>
@@ -557,22 +529,28 @@ const AdminUsers = () => {
                             {user.id}
                           </td>
                           <td className="p-4 text-white font-medium">
-                            {user.name}
+                            {user.name || "-"}
                           </td>
                           <td className="p-4 text-[#9cbaa8]">
                             {user.username}
-                          </td>
-                          <td className="p-4 text-white font-mono text-xs">
-                            {user.emp_no || "-"}
                           </td>
                           <td className="p-4 text-[#9cbaa8]">
                             {user.mobile || "-"}
                           </td>
                           <td className="p-4 text-[#9cbaa8]">
-                            {user.branch?.name || "-"}
+                            {user.branch || "-"}
                           </td>
                           <td className="p-4 text-[#9cbaa8]">
-                            {user.department?.name || "-"}
+                            {user.department || "-"}
+                          </td>
+                          <td className="p-4">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              user.auth_provider === 'microsoft' 
+                                ? 'bg-blue-500/10 text-blue-400' 
+                                : 'bg-green-500/10 text-green-400'
+                            }`}>
+                              {user.auth_provider === 'microsoft' ? 'Microsoft' : 'Local'}
+                            </span>
                           </td>
                           <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
@@ -766,7 +744,7 @@ const AdminUsers = () => {
                 {/* Full Name */}
                 <div>
                   <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
-                    Full Name <span className="text-red-400">*</span>
+                    Full Name
                   </label>
                   <input
                     type="text"
@@ -787,37 +765,13 @@ const AdminUsers = () => {
                   )}
                 </div>
 
-                {/* Employee Number */}
+                {/* Email (Username) */}
                 <div>
                   <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
-                    Employee Number
+                    Email <span className="text-red-400">*</span>
                   </label>
                   <input
-                    type="text"
-                    name="emp_no"
-                    value={formData.emp_no}
-                    onChange={handleInputChange}
-                    className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${
-                      fieldErrors.emp_no
-                        ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
-                        : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
-                    }`}
-                    placeholder="33xx"
-                  />
-                  {fieldErrors.emp_no && (
-                    <p className="mt-1 text-xs text-red-400">
-                      {fieldErrors.emp_no}
-                    </p>
-                  )}
-                </div>
-
-                {/* Username */}
-                <div>
-                  <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
-                    Username <span className="text-red-400">*</span>
-                  </label>
-                  <input
-                    type="text"
+                    type="email"
                     name="username"
                     value={formData.username}
                     onChange={handleInputChange}
@@ -826,7 +780,7 @@ const AdminUsers = () => {
                         ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
                         : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
                     }`}
-                    placeholder="username@dlt.lk"
+                    placeholder="user@example.com"
                   />
                   {fieldErrors.username && (
                     <p className="mt-1 text-xs text-red-400">
@@ -887,7 +841,7 @@ const AdminUsers = () => {
                 {/* Mobile */}
                 <div>
                   <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
-                    Mobile Number <span className="text-red-400">*</span>
+                    Mobile Number
                   </label>
                   <input
                     type="tel"
@@ -913,55 +867,45 @@ const AdminUsers = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
-                      Branch <span className="text-red-400">*</span>
+                      Branch
                     </label>
-                    <select
-                      name="branch_id"
-                      value={formData.branch_id}
+                    <input
+                      type="text"
+                      name="branch"
+                      value={formData.branch}
                       onChange={handleInputChange}
-                      className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white focus:outline-none focus:ring-1 transition-all appearance-none cursor-pointer ${
-                        fieldErrors.branch_id
+                      className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${
+                        fieldErrors.branch
                           ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
                           : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
                       }`}
-                    >
-                      <option value="">Select Branch</option>
-                      {branches.map((branch) => (
-                        <option key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </option>
-                      ))}
-                    </select>
-                    {fieldErrors.branch_id && (
+                      placeholder="Enter branch"
+                    />
+                    {fieldErrors.branch && (
                       <p className="mt-1 text-xs text-red-400">
-                        {fieldErrors.branch_id}
+                        {fieldErrors.branch}
                       </p>
                     )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
-                      Department <span className="text-red-400">*</span>
+                      Department
                     </label>
-                    <select
-                      name="department_id"
-                      value={formData.department_id}
+                    <input
+                      type="text"
+                      name="department"
+                      value={formData.department}
                       onChange={handleInputChange}
-                      className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white focus:outline-none focus:ring-1 transition-all appearance-none cursor-pointer ${
-                        fieldErrors.department_id
+                      className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${
+                        fieldErrors.department
                           ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
                           : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
                       }`}
-                    >
-                      <option value="">Select Department</option>
-                      {departments.map((dept) => (
-                        <option key={dept.id} value={dept.id}>
-                          {dept.name}
-                        </option>
-                      ))}
-                    </select>
-                    {fieldErrors.department_id && (
+                      placeholder="Enter department"
+                    />
+                    {fieldErrors.department && (
                       <p className="mt-1 text-xs text-red-400">
-                        {fieldErrors.department_id}
+                        {fieldErrors.department}
                       </p>
                     )}
                   </div>

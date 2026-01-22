@@ -1,28 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMsal } from '@azure/msal-react';
 import { useAuth } from '../context/AuthContext';
+import { loginRequest } from '../config/msalConfig';
+import { fetchMsGraphProfile, logMicrosoftUserDetails } from '../services/msGraphService';
 import api from '../utils/api';
 import * as yup from 'yup';
 
 // Login validation schema
 const loginSchema = yup.object().shape({
-  username: yup.string().trim().required('Username is required'),
+  username: yup.string().trim().required('Email is required').email('Please enter a valid email'),
   password: yup.string().required('Password is required').min(3, 'Password must be at least 3 characters')
 });
 
-// Registration validation schema
+// Registration validation schema - simplified
 const registerSchema = yup.object().shape({
   name: yup.string()
-    .required('Full name is required')
-    .min(2, 'Name must be at least 2 characters')
     .max(100, 'Name must not exceed 100 characters'),
-  emp_no: yup.string()
-    .required('Employee number is required')
-    .max(45, 'Employee number must not exceed 45 characters'),
   username: yup.string()
-    .required('Username is required')
-    .min(3, 'Username must be at least 3 characters')
-    .max(100, 'Username must not exceed 100 characters'),
+    .required('Email is required')
+    .email('Please enter a valid email address')
+    .max(100, 'Email must not exceed 100 characters'),
   password: yup.string()
     .required('Password is required')
     .min(3, 'Password must be at least 3 characters'),
@@ -30,23 +28,17 @@ const registerSchema = yup.object().shape({
     .required('Please confirm your password')
     .oneOf([yup.ref('password')], 'Passwords must match'),
   mobile: yup.string()
-    .required('Mobile number is required')
-    .matches(/^\d{10}$/, 'Mobile number must be exactly 10 digits'),
-  branch_id: yup.number()
-    .transform((value, originalValue) => originalValue === '' ? undefined : value)
-    .typeError('Please select a branch')
-    .required('Please select a branch')
-    .positive('Please select a branch'),
-  department_id: yup.number()
-    .transform((value, originalValue) => originalValue === '' ? undefined : value)
-    .typeError('Please select a department')
-    .required('Please select a department')
-    .positive('Please select a department')
+    .matches(/^$|^\d{10,15}$/, 'Mobile number must be 10-15 digits'),
+  department: yup.string()
+    .max(100, 'Department must not exceed 100 characters'),
+  branch: yup.string()
+    .max(100, 'Branch/City must not exceed 100 characters')
 });
 
 const Login = () => {
   const navigate = useNavigate();
   const { login, isAuthenticated } = useAuth();
+  const { instance } = useMsal();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
@@ -54,6 +46,7 @@ const Login = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [msLoading, setMsLoading] = useState(false);
 
   // Registration modal state
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
@@ -66,43 +59,20 @@ const Login = () => {
   const [registerFieldErrors, setRegisterFieldErrors] = useState({});
   const [registerFormData, setRegisterFormData] = useState({
     name: '',
-    emp_no: '',
     username: '',
     password: '',
     confirmPassword: '',
     mobile: '',
-    branch_id: '',
-    department_id: ''
+    department: '',
+    branch: ''
   });
 
-  // Lookup data
-  const [branches, setBranches] = useState([]);
-  const [departments, setDepartments] = useState([]);
-
-  // Fetch branches and departments when modal opens
+  // Redirect if already logged in (using useEffect to avoid render-time navigation)
   useEffect(() => {
-    if (isRegisterModalOpen) {
-      const fetchLookupData = async () => {
-        try {
-          const [branchesRes, departmentsRes] = await Promise.all([
-            api.get('/public/branches'),
-            api.get('/public/departments')
-          ]);
-          setBranches(branchesRes.data || []);
-          setDepartments(departmentsRes.data || []);
-        } catch (error) {
-          console.error('Failed to fetch lookup data:', error);
-        }
-      };
-      fetchLookupData();
+    if (isAuthenticated()) {
+      navigate('/', { replace: true });
     }
-  }, [isRegisterModalOpen]);
-
-  // Redirect if already logged in
-  if (isAuthenticated()) {
-    navigate('/', { replace: true });
-    return null;
-  }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -145,17 +115,123 @@ const Login = () => {
     if (error) setError('');
   };
 
+  // Microsoft Sign-In Handler - Using REDIRECT flow
+  const handleMicrosoftSignIn = async () => {
+    setError('');
+    setMsLoading(true);
+    
+    try {
+      console.log("🔄 Starting Microsoft login redirect...");
+      
+      // Use redirect instead of popup (more reliable)
+      await instance.loginRedirect(loginRequest);
+      
+      // Note: Code after loginRedirect won't execute immediately
+      // The page will redirect to Microsoft, then back to our app
+      // The response will be handled in useEffect below
+      
+    } catch (err) {
+      console.error("❌ Microsoft Sign-In Error:", err);
+      setError(err.message || 'Microsoft sign-in failed');
+      setMsLoading(false);
+    }
+  };
+
+  // Check for Microsoft login on component mount (after redirect back)
+  useEffect(() => {
+    const handleMsLoginResponse = async () => {
+      // Skip if user just logged out (flag in sessionStorage)
+      const justLoggedOut = sessionStorage.getItem('just_logged_out');
+      if (justLoggedOut) {
+        sessionStorage.removeItem('just_logged_out');
+        // Clear MSAL accounts to prevent auto-login
+        const accounts = instance.getAllAccounts();
+        if (accounts.length > 0) {
+          await instance.logoutPopup({ account: accounts[0], mainWindowRedirectUri: '/login' }).catch(() => {
+            // Fallback: just clear the account from cache
+            instance.setActiveAccount(null);
+          });
+        }
+        return;
+      }
+      
+      const accounts = instance.getAllAccounts();
+      
+      if (accounts.length > 0) {
+        console.log("✅ Found Microsoft account:", accounts[0]);
+        setMsLoading(true);
+        
+        try {
+          // Acquire token for Graph API
+          console.log("🔄 Acquiring token for Graph API...");
+          const tokenResponse = await instance.acquireTokenSilent({
+            ...loginRequest,
+            account: accounts[0],
+          });
+          
+          console.log("✅ Access Token acquired");
+          
+          // Fetch user details from Microsoft Graph
+          console.log("🔄 Fetching profile from Microsoft Graph API...");
+          const graphProfile = await fetchMsGraphProfile(tokenResponse.accessToken);
+          console.log("✅ Graph Profile fetched:", graphProfile);
+          
+          // Log all the details
+          const mappedUserData = logMicrosoftUserDetails(accounts[0], graphProfile);
+          console.log("📋 Mapped User Data for Registration:", mappedUserData);
+          
+          // Send to backend to register/login
+          console.log("🔄 Sending to backend for authentication...");
+          const response = await api.post('/auth/microsoft', {
+            microsoftId: mappedUserData.microsoftId,
+            email: mappedUserData.email,
+            displayName: mappedUserData.displayName,
+            department: mappedUserData.department,
+            mobilePhone: mappedUserData.mobilePhone,
+            city: mappedUserData.city // City from MS - used as branch
+          });
+          
+          if (response.success) {
+            console.log("✅ Backend authentication successful:", response);
+            
+            // Login with the returned token
+            login(response.data, response.token);
+            
+            // Show message based on new or existing user
+            if (response.isNewUser) {
+              console.log("🆕 New user account created");
+            } else {
+              console.log("👤 Existing user logged in");
+            }
+            
+            // Navigate to dashboard
+            navigate('/', { replace: true });
+          } else {
+            setError(response.message || 'Microsoft sign-in failed');
+          }
+          
+        } catch (err) {
+          console.error("Error during Microsoft auth:", err);
+          setError(err.message || 'Microsoft sign-in failed');
+        } finally {
+          setMsLoading(false);
+        }
+      }
+    };
+    
+    handleMsLoginResponse();
+  }, [instance, login, navigate]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Registration handlers
   const resetRegisterForm = () => {
     setRegisterFormData({
       name: '',
-      emp_no: '',
       username: '',
       password: '',
       confirmPassword: '',
       mobile: '',
-      branch_id: '',
-      department_id: ''
+      department: '',
+      branch: ''
     });
     setRegisterError('');
     setRegisterSuccess('');
@@ -207,13 +283,12 @@ const Login = () => {
 
     try {
       const payload = {
-        name: registerFormData.name,
-        emp_no: registerFormData.emp_no,
+        name: registerFormData.name || null,
         username: registerFormData.username,
         password: registerFormData.password,
-        mobile: registerFormData.mobile,
-        branch_id: parseInt(registerFormData.branch_id),
-        department_id: parseInt(registerFormData.department_id)
+        mobile: registerFormData.mobile || null,
+        department: registerFormData.department || null,
+        branch: registerFormData.branch || null
       };
 
       await api.post('/auth/register', payload);
@@ -333,6 +408,39 @@ const Login = () => {
               )}
             </button>
           </form>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-2">
+            <div className="flex-1 h-px bg-[#28392f]"></div>
+            <span className="text-[#9eb7a8] text-xs font-medium">OR</span>
+            <div className="flex-1 h-px bg-[#28392f]"></div>
+          </div>
+
+          {/* Microsoft Sign-In Button */}
+          <button
+            type="button"
+            onClick={handleMicrosoftSignIn}
+            disabled={msLoading}
+            className="w-full h-11 bg-[#2f2f2f] hover:bg-[#3c3c3c] active:scale-[0.98] text-white text-sm font-semibold rounded-xl border border-[#3c3c3c] transition-all duration-200 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {msLoading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                <span>Signing in...</span>
+              </>
+            ) : (
+              <>
+                {/* Microsoft Logo SVG */}
+                <svg className="w-5 h-5" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+                  <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+                  <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+                  <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+                </svg>
+                <span>Sign in with Microsoft</span>
+              </>
+            )}
+          </button>
 
           {/* Footer / Help */}
           <div className="pt-1 text-center space-y-2">
@@ -500,11 +608,11 @@ const Login = () => {
               )}
 
               <div className="space-y-4">
-                {/* Full Name & Employee Number */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Full Name & Email */}
+                <div className="grid grid-cols-1 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[#9cbaa8] mb-1.5">
-                      Full Name <span className="text-red-400">*</span>
+                      Full Name
                     </label>
                     <input
                       type="text"
@@ -512,38 +620,24 @@ const Login = () => {
                       value={registerFormData.name}
                       onChange={handleRegisterChange}
                       className={`w-full h-10 px-3 rounded-xl bg-[#1d2d25] border text-white text-sm placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${registerFieldErrors.name ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'border-[#28392f] focus:border-primary/50 focus:ring-primary/50'}`}
-                      placeholder="Enter full name"
+                      placeholder="Enter full name (optional)"
                     />
                     {registerFieldErrors.name && <p className="mt-1 text-xs text-red-400">{registerFieldErrors.name}</p>}
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-[#9cbaa8] mb-1.5">
-                      Employee No <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      name="emp_no"
-                      value={registerFormData.emp_no}
-                      onChange={handleRegisterChange}
-                      className={`w-full h-10 px-3 rounded-xl bg-[#1d2d25] border text-white text-sm placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${registerFieldErrors.emp_no ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'border-[#28392f] focus:border-primary/50 focus:ring-primary/50'}`}
-                      placeholder="e.g. 33xx"
-                    />
-                    {registerFieldErrors.emp_no && <p className="mt-1 text-xs text-red-400">{registerFieldErrors.emp_no}</p>}
-                  </div>
                 </div>
 
-                {/* Username */}
+                {/* Email (Username) */}
                 <div>
                   <label className="block text-sm font-medium text-[#9cbaa8] mb-1.5">
-                    Username <span className="text-red-400">*</span>
+                    Email <span className="text-red-400">*</span>
                   </label>
                   <input
-                    type="text"
+                    type="email"
                     name="username"
                     value={registerFormData.username}
                     onChange={handleRegisterChange}
                     className={`w-full h-10 px-3 rounded-xl bg-[#1d2d25] border text-white text-sm placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${registerFieldErrors.username ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'border-[#28392f] focus:border-primary/50 focus:ring-primary/50'}`}
-                    placeholder="user@dlt.lk"
+                    placeholder="your.email@example.com"
                   />
                   {registerFieldErrors.username && <p className="mt-1 text-xs text-red-400">{registerFieldErrors.username}</p>}
                 </div>
@@ -605,7 +699,7 @@ const Login = () => {
                 {/* Mobile */}
                 <div>
                   <label className="block text-sm font-medium text-[#9cbaa8] mb-1.5">
-                    Mobile Number <span className="text-red-400">*</span>
+                    Mobile Number
                   </label>
                   <input
                     type="tel"
@@ -613,8 +707,8 @@ const Login = () => {
                     value={registerFormData.mobile}
                     onChange={handleRegisterChange}
                     className={`w-full h-10 px-3 rounded-xl bg-[#1d2d25] border text-white text-sm placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${registerFieldErrors.mobile ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'border-[#28392f] focus:border-primary/50 focus:ring-primary/50'}`}
-                    placeholder="10 digit mobile number"
-                    maxLength={10}
+                    placeholder="10-15 digit mobile number (optional)"
+                    maxLength={15}
                   />
                   {registerFieldErrors.mobile && <p className="mt-1 text-xs text-red-400">{registerFieldErrors.mobile}</p>}
                 </div>
@@ -623,37 +717,31 @@ const Login = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[#9cbaa8] mb-1.5">
-                      Branch <span className="text-red-400">*</span>
+                      Branch / City
                     </label>
-                    <select
-                      name="branch_id"
-                      value={registerFormData.branch_id}
+                    <input
+                      type="text"
+                      name="branch"
+                      value={registerFormData.branch}
                       onChange={handleRegisterChange}
-                      className={`w-full h-10 px-3 rounded-xl bg-[#1d2d25] border text-white text-sm focus:outline-none focus:ring-1 transition-all appearance-none cursor-pointer ${registerFieldErrors.branch_id ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'border-[#28392f] focus:border-primary/50 focus:ring-primary/50'}`}
-                    >
-                      <option value="">Select Branch</option>
-                      {branches.map(branch => (
-                        <option key={branch.id} value={branch.id}>{branch.name}</option>
-                      ))}
-                    </select>
-                    {registerFieldErrors.branch_id && <p className="mt-1 text-xs text-red-400">{registerFieldErrors.branch_id}</p>}
+                      className={`w-full h-10 px-3 rounded-xl bg-[#1d2d25] border text-white text-sm placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${registerFieldErrors.branch ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'border-[#28392f] focus:border-primary/50 focus:ring-primary/50'}`}
+                      placeholder="e.g. Colombo (optional)"
+                    />
+                    {registerFieldErrors.branch && <p className="mt-1 text-xs text-red-400">{registerFieldErrors.branch}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#9cbaa8] mb-1.5">
-                      Department <span className="text-red-400">*</span>
+                      Department
                     </label>
-                    <select
-                      name="department_id"
-                      value={registerFormData.department_id}
+                    <input
+                      type="text"
+                      name="department"
+                      value={registerFormData.department}
                       onChange={handleRegisterChange}
-                      className={`w-full h-10 px-3 rounded-xl bg-[#1d2d25] border text-white text-sm focus:outline-none focus:ring-1 transition-all appearance-none cursor-pointer ${registerFieldErrors.department_id ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'border-[#28392f] focus:border-primary/50 focus:ring-primary/50'}`}
-                    >
-                      <option value="">Select Department</option>
-                      {departments.map(dept => (
-                        <option key={dept.id} value={dept.id}>{dept.name}</option>
-                      ))}
-                    </select>
-                    {registerFieldErrors.department_id && <p className="mt-1 text-xs text-red-400">{registerFieldErrors.department_id}</p>}
+                      className={`w-full h-10 px-3 rounded-xl bg-[#1d2d25] border text-white text-sm placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${registerFieldErrors.department ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'border-[#28392f] focus:border-primary/50 focus:ring-primary/50'}`}
+                      placeholder="e.g. IT (optional)"
+                    />
+                    {registerFieldErrors.department && <p className="mt-1 text-xs text-red-400">{registerFieldErrors.department}</p>}
                   </div>
                 </div>
               </div>

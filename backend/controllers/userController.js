@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Ticket, Message, User, Admin, Branch, Department, Notice } = require('../models/associations');
+const { Ticket, Message, User, Admin, Notice } = require('../models/associations');
 const path = require('path');
 
 // @desc    Create a new ticket
@@ -72,11 +72,7 @@ const createTicket = async (req, res, next) => {
         {
           model: User,
           as: 'user',
-          attributes: ['id', 'name', 'emp_no'],
-          include: [
-            { model: Branch, as: 'branch', attributes: ['id', 'name'] },
-            { model: Department, as: 'department', attributes: ['id', 'name'] }
-          ]
+          attributes: ['id', 'name', 'department', 'branch']
         }
       ]
     });
@@ -135,11 +131,7 @@ const getTickets = async (req, res, next) => {
         {
           model: User,
           as: 'user',
-          attributes: ['id', 'name', 'emp_no'],
-          include: [
-            { model: Branch, as: 'branch', attributes: ['id', 'name'] },
-            { model: Department, as: 'department', attributes: ['id', 'name'] }
-          ]
+          attributes: ['id', 'name', 'department', 'branch']
         }
       ],
       order: [['date', 'DESC']],
@@ -192,11 +184,7 @@ const getTicketById = async (req, res, next) => {
         {
           model: User,
           as: 'user',
-          attributes: ['id', 'name', 'emp_no'],
-          include: [
-            { model: Branch, as: 'branch', attributes: ['id', 'name'] },
-            { model: Department, as: 'department', attributes: ['id', 'name'] }
-          ]
+          attributes: ['id', 'name', 'department', 'branch']
         }
       ],
       order: [[{ model: Message, as: 'messages' }, 'createdAt', 'ASC']]

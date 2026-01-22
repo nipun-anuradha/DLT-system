@@ -1,44 +1,6 @@
-const { Branch, Department } = require('../models/associations');
+// Public controller
+// Note: Branch and Department are now stored as strings in the User model
+// These endpoints are deprecated but kept for backward compatibility
 
-// @desc    Get all branches
-// @route   GET /api/public/branches
-// @access  Public
-const getBranches = async (req, res, next) => {
-  try {
-    const branches = await Branch.findAll({
-      attributes: ['id', 'name'],
-      order: [['name', 'ASC']]
-    });
-
-    res.json({
-      success: true,
-      data: branches
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Get all departments
-// @route   GET /api/public/departments
-// @access  Public
-const getDepartments = async (req, res, next) => {
-  try {
-    const departments = await Department.findAll({
-      attributes: ['id', 'name'],
-      order: [['name', 'ASC']]
-    });
-
-    res.json({
-      success: true,
-      data: departments
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-module.exports = {
-  getBranches,
-  getDepartments
-};
+// Empty module - no public endpoints needed anymore
+module.exports = {};

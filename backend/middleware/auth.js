@@ -19,7 +19,7 @@ const authenticateUser = async (req, res, next) => {
 
     // Verify user still exists in database
     const user = await User.findByPk(decoded.id, {
-      attributes: ['id', 'name', 'username', 'emp_no', 'mobile', 'branch_id', 'department_id']
+      attributes: ['id', 'name', 'username', 'mobile', 'department', 'branch', 'auth_provider']
     });
 
     if (!user) {

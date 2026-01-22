@@ -11,40 +11,43 @@ const User = sequelize.define('User', {
   },
   name: {
     type: DataTypes.STRING(100),
-    allowNull: false,
-  },
-  emp_no: {
-    type: DataTypes.STRING(45),
-    allowNull: true,
+    allowNull: true, // Can be null, will use displayName from MS
   },
   username: {
     type: DataTypes.STRING(100),
     allowNull: false,
     unique: true,
+    // This will be the email address (from MS login or manual registration)
   },
   password: {
     type: DataTypes.TEXT,
-    allowNull: false,
+    allowNull: true, // Null for MS-only users
   },
   mobile: {
-    type: DataTypes.STRING(10),
+    type: DataTypes.STRING(15),
     allowNull: true,
   },
-  branch_id: {
-    type: DataTypes.INTEGER,
+  department: {
+    type: DataTypes.STRING(100),
     allowNull: true,
-    references: {
-      model: 'branch',
-      key: 'id'
-    }
+    // String field instead of foreign key
   },
-  department_id: {
-    type: DataTypes.INTEGER,
+  branch: {
+    type: DataTypes.STRING(100),
     allowNull: true,
-    references: {
-      model: 'department',
-      key: 'id'
-    }
+    // String field instead of foreign key (city from MS)
+  },
+  microsoft_id: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+    unique: true,
+    // Microsoft user ID for linking MS accounts
+  },
+  auth_provider: {
+    type: DataTypes.ENUM('local', 'microsoft'),
+    allowNull: false,
+    defaultValue: 'local',
+    // Track how user was created
   }
 }, {
   tableName: 'user',
@@ -56,7 +59,7 @@ const User = sequelize.define('User', {
       }
     },
     beforeUpdate: async (user) => {
-      if (user.changed('password')) {
+      if (user.changed('password') && user.password) {
         user.password = await bcrypt.hash(user.password, 10);
       }
     }
@@ -65,12 +68,18 @@ const User = sequelize.define('User', {
 
 // Instance method to verify password
 User.prototype.verifyPassword = async function(password) {
+  if (!this.password) return false;
   return bcrypt.compare(password, this.password);
 };
 
-// Class method to find by username
+// Class method to find by username (email)
 User.findByUsername = async function(username) {
   return this.findOne({ where: { username } });
+};
+
+// Class method to find by Microsoft ID
+User.findByMicrosoftId = async function(microsoftId) {
+  return this.findOne({ where: { microsoft_id: microsoftId } });
 };
 
 module.exports = User;

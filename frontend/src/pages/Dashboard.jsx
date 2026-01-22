@@ -77,7 +77,7 @@ const modules = [
     }
   },
   {
-    id: 2,
+    id: 3,
     title: 'HR',
     description: 'Employee directory, leave management, and benefits.',
     icon: 'group',
@@ -89,7 +89,7 @@ const modules = [
     }
   },
   {
-    id: 3,
+    id: 4,
     title: 'Supply Chain',
     description: 'Procurement, logistics, and supplier management.',
     icon: 'local_shipping',
@@ -101,7 +101,7 @@ const modules = [
     }
   },
   {
-    id: 4,
+    id: 5,
     title: 'Engineering',
     description: 'Design management, technical documentation, and approvals.',
     icon: 'engineering',
@@ -113,7 +113,7 @@ const modules = [
     }
   },
   {
-    id: 5,
+    id: 6,
     title: 'Production',
     description: 'Production planning, schedules, and output monitoring.',
     icon: 'factory',
@@ -125,7 +125,7 @@ const modules = [
     }
   },
   {
-    id: 6,
+    id: 7,
     title: 'Stores',
     description: 'Inventory tracking, stock movements, and audits.',
     icon: 'inventory_2',
@@ -137,7 +137,7 @@ const modules = [
     }
   },
   {
-    id: 7,
+    id: 8,
     title: 'Maintenance',
     description: 'Equipment maintenance, breakdown reports, and schedules.',
     icon: 'build',
@@ -149,7 +149,7 @@ const modules = [
     }
   },
   {
-    id: 8,
+    id: 9,
     title: 'Finance',
     description: 'Payroll, expense claims, and financial reporting.',
     icon: 'payments',
@@ -161,7 +161,7 @@ const modules = [
     }
   },
   {
-    id: 9,
+    id: 10,
     title: 'Quality Control',
     description: 'Inspections, quality reports, and compliance tracking.',
     icon: 'verified',
