@@ -9,13 +9,19 @@ const { errorHandler, notFound } = require('./middleware');
 const app = express();
 
 // CORS configuration
+// app.use(cors({
+//   origin: [
+//     process.env.FRONTEND_URL,
+//     "http://localhost:5173"
+//   ],
+//   credentials: true
+// }));
+
 app.use(cors({
-  origin: [
-    process.env.FRONTEND_URL,
-    "http://localhost:5173"
-  ],
+  origin: true,
   credentials: true
 }));
+
 
 // Body parser middleware
 app.use(express.json());
