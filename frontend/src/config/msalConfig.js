@@ -12,11 +12,11 @@ export const msalConfig = {
     
     // Redirect URI - must match the one configured in Azure Portal
     // redirectUri: "http://localhost:5173",
-    redirectUri: import.meta.env.ENTRA_REDIRECT_URI,
+    redirectUri: import.meta.env.REDIRECT_URL,
     
     // Post logout redirect
     // postLogoutRedirectUri: "http://localhost:5173",
-    postLogoutRedirectUri: import.meta.env.ENTRA_REDIRECT_URI,
+    postLogoutRedirectUri: import.meta.env.REDIRECT_URL,
     
     // Navigate to request URL after login
     navigateToLoginRequestUrl: false,
