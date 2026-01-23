@@ -4,17 +4,19 @@
 export const msalConfig = {
   auth: {
     // Replace with your App Registration Client ID from Azure Portal
-    clientId: "1221c6ce-0c0f-4353-996a-b4a764d3aee1",
+    clientId: import.meta.env.ENTRA_CLIENT_ID,
     
     // Replace with your tenant ID or use 'common' for multi-tenant
     // Your tenant ID: 33c0b256-5795-4a3c-a551-e6d8d24728f8
     authority: "https://login.microsoftonline.com/33c0b256-5795-4a3c-a551-e6d8d24728f8",
     
     // Redirect URI - must match the one configured in Azure Portal
-    redirectUri: "http://localhost:5173",
+    // redirectUri: "http://localhost:5173",
+    redirectUri: import.meta.env.ENTRA_REDIRECT_URI,
     
     // Post logout redirect
-    postLogoutRedirectUri: "http://localhost:5173",
+    // postLogoutRedirectUri: "http://localhost:5173",
+    postLogoutRedirectUri: import.meta.env.ENTRA_REDIRECT_URI,
     
     // Navigate to request URL after login
     navigateToLoginRequestUrl: false,
