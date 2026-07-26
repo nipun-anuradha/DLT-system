@@ -4,11 +4,13 @@ const { authenticateUser } = require('../middleware/auth');
 const { upload, handleUploadError } = require('../middleware/upload');
 const {
   createTicket,
+  getIssueHierarchy,
   getTickets,
   getTicketById,
   getDashboardCounts,
   addMessage,
   getNotices,
+  getAdmins,
   closeTicket
 } = require('../controllers/userController');
 
@@ -17,8 +19,10 @@ router.use(authenticateUser);
 
 // Dashboard counts - must be before /:id route
 router.get('/tickets/dashboard/counts', getDashboardCounts);
+router.get('/admins', getAdmins);
 
 // Ticket routes
+router.get('/issue-hierarchy', getIssueHierarchy);
 router.post('/tickets', upload.array('attachments', 5), handleUploadError, createTicket);
 router.get('/tickets', getTickets);
 router.get('/tickets/:id', getTicketById);

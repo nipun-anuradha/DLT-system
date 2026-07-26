@@ -6,10 +6,21 @@ const {
   // Dashboard
   getDashboardCounts,
   getRecentTickets,
+  // Inventory
+  getInventorySummary,
+  getAssetTypes,
+  getInventoryItems,
+  getInventoryItemById,
+  getInventoryUserHistory,
+  getInventoryItemHistory,
+  createInventoryItem,
+  updateInventoryItem,
+  transferInventoryItem,
   // Tickets
   getAllTickets,
   getTicketById,
   updateTicket,
+  takeTicket,
   addAdminMessage,
   // Users
   getAllUsers,
@@ -33,10 +44,22 @@ router.use(authenticateAdmin);
 router.get('/dashboard/counts', getDashboardCounts);
 router.get('/dashboard/recent-tickets', getRecentTickets);
 
+// ==================== INVENTORY ====================
+router.get('/inventory/summary', getInventorySummary);
+router.get('/inventory/asset-types', getAssetTypes);
+router.get('/inventory/items', getInventoryItems);
+router.get('/inventory/items/:id', getInventoryItemById);
+router.get('/inventory/items/:id/history', getInventoryItemHistory);
+router.get('/inventory/users/:id/history', getInventoryUserHistory);
+router.post('/inventory/items', createInventoryItem);
+router.put('/inventory/items/:id', updateInventoryItem);
+router.post('/inventory/items/:id/transfer', transferInventoryItem);
+
 // ==================== TICKETS ====================
 router.get('/tickets', getAllTickets);
 router.get('/tickets/:id', getTicketById);
 router.put('/tickets/:id', updateTicket);
+router.put('/tickets/:id/take', takeTicket);
 router.post('/tickets/:id/messages', upload.array('attachments', 5), handleUploadError, addAdminMessage);
 
 // ==================== USERS ====================

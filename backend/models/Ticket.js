@@ -18,7 +18,19 @@ const Ticket = sequelize.define('Ticket', {
     defaultValue: DataTypes.NOW,
   },
   category: {
-    type: DataTypes.ENUM('hardware', 'software', 'network', 'item', 'other'),
+    type: DataTypes.ENUM('hardware', 'software', 'network', 'item', 'other', 'system', 'internet', 'request'),
+    allowNull: true,
+  },
+  issue_category: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+  },
+  issue_type: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+  },
+  issue_detail: {
+    type: DataTypes.STRING(50),
     allowNull: true,
   },
   priority: {
@@ -26,9 +38,33 @@ const Ticket = sequelize.define('Ticket', {
     allowNull: true,
   },
   status: {
-    type: DataTypes.ENUM('open', 'inprogress', 'close'),
+    type: DataTypes.ENUM('open', 'taken', 'inprogress', 'close'),
     allowNull: true,
     defaultValue: 'open',
+  },
+  assigned_admin_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'admin',
+      key: 'id'
+    }
+  },
+  resolved_by_admin_id: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'admin',
+      key: 'id'
+    }
+  },
+  assigned_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+  resolved_at: {
+    type: DataTypes.DATE,
+    allowNull: true,
   },
   user_id: {
     type: DataTypes.INTEGER,

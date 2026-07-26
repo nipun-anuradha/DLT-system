@@ -26,6 +26,7 @@ const testConnection = async () => {
     console.log('✅ Database connected successfully');
     await sequelize.sync({ alter: true });
     console.log('Database synchronized successfully.');
+    await sequelize.query("UPDATE ticket SET status = 'inprogress' WHERE status = 'taken'");
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);
     process.exit(1);

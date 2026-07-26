@@ -30,8 +30,10 @@ const registerSchema = yup.object().shape({
   mobile: yup.string()
     .matches(/^$|^\d{10,15}$/, 'Mobile number must be 10-15 digits'),
   department: yup.string()
+    .required('Department is required')
     .max(100, 'Department must not exceed 100 characters'),
   branch: yup.string()
+    .required('Branch/City is required')
     .max(100, 'Branch/City must not exceed 100 characters')
 });
 
@@ -56,6 +58,10 @@ const Login = () => {
   const [registerLoading, setRegisterLoading] = useState(false);
   const [registerError, setRegisterError] = useState('');
   const [registerSuccess, setRegisterSuccess] = useState('');
+  const [registerLookupLoading, setRegisterLookupLoading] = useState(false);
+  const [registerLookupError, setRegisterLookupError] = useState('');
+  const [branchOptions, setBranchOptions] = useState([]);
+  const [departmentOptions, setDepartmentOptions] = useState([]);
   const [registerFieldErrors, setRegisterFieldErrors] = useState({});
   const [registerFormData, setRegisterFormData] = useState({
     name: '',
@@ -247,6 +253,37 @@ const Login = () => {
     setIsRegisterModalOpen(false);
     resetRegisterForm();
   };
+
+  useEffect(() => {
+    const loadRegistrationData = async () => {
+      if (!isRegisterModalOpen) {
+        return;
+      }
+
+      if (branchOptions.length > 0 || departmentOptions.length > 0) {
+        return;
+      }
+
+      setRegisterLookupLoading(true);
+      setRegisterLookupError('');
+
+      try {
+        const response = await api.get('/public/registration-data');
+        if (response.success) {
+          setBranchOptions(response.data?.branches || []);
+          setDepartmentOptions(response.data?.departments || []);
+        } else {
+          setRegisterLookupError(response.message || 'Failed to load registration options');
+        }
+      } catch (error) {
+        setRegisterLookupError(error.message || 'Failed to load registration options');
+      } finally {
+        setRegisterLookupLoading(false);
+      }
+    };
+
+    loadRegistrationData();
+  }, [isRegisterModalOpen, branchOptions.length, departmentOptions.length]);
 
   const handleRegisterChange = (e) => {
     const { name, value } = e.target;
@@ -522,11 +559,15 @@ const Login = () => {
                   </a>
                   <a href="mailto:thanuja@dlt.lk" className="flex items-center gap-2 text-[#9cbaa8] hover:text-primary transition-colors text-sm">
                     <span className="material-symbols-outlined text-base">mail</span>
-                    thanuja@dlt.lk
+                    buddila.amarasinghe@dlt.lk
                   </a>
                   <a href="mailto:nipun.anuradha@dlt.lk" className="flex items-center gap-2 text-[#9cbaa8] hover:text-primary transition-colors text-sm">
                     <span className="material-symbols-outlined text-base">mail</span>
                     nipun.anuradha@dlt.lk
+                  </a>
+                  <a href="mailto:nipun.anuradha@dlt.lk" className="flex items-center gap-2 text-[#9cbaa8] hover:text-primary transition-colors text-sm">
+                    <span className="material-symbols-outlined text-base">mail</span>
+                    anuji.perera@dlt.lk
                   </a>
                 </div>
               </div>
@@ -717,34 +758,53 @@ const Login = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-[#9cbaa8] mb-1.5">
-                      Branch / City
+                      Branch / City <span className="text-red-400">*</span>
                     </label>
-                    <input
-                      type="text"
+                    <select
                       name="branch"
                       value={registerFormData.branch}
                       onChange={handleRegisterChange}
-                      className={`w-full h-10 px-3 rounded-xl bg-[#1d2d25] border text-white text-sm placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${registerFieldErrors.branch ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'border-[#28392f] focus:border-primary/50 focus:ring-primary/50'}`}
-                      placeholder="e.g. Colombo (optional)"
-                    />
+                      disabled={registerLookupLoading}
+                      className={`w-full h-10 px-3 rounded-xl bg-[#1d2d25] border text-white text-sm focus:outline-none focus:ring-1 transition-all disabled:opacity-60 disabled:cursor-not-allowed ${registerFieldErrors.branch ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'border-[#28392f] focus:border-primary/50 focus:ring-primary/50'}`}
+                    >
+                      <option value="">{registerLookupLoading ? 'Loading branches...' : 'Select a branch'}</option>
+                      {branchOptions.map((branch) => (
+                        <option key={branch.id} value={branch.name}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
                     {registerFieldErrors.branch && <p className="mt-1 text-xs text-red-400">{registerFieldErrors.branch}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-[#9cbaa8] mb-1.5">
-                      Department
+                      Department <span className="text-red-400">*</span>
                     </label>
-                    <input
-                      type="text"
+                    <select
                       name="department"
                       value={registerFormData.department}
                       onChange={handleRegisterChange}
-                      className={`w-full h-10 px-3 rounded-xl bg-[#1d2d25] border text-white text-sm placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${registerFieldErrors.department ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'border-[#28392f] focus:border-primary/50 focus:ring-primary/50'}`}
-                      placeholder="e.g. IT (optional)"
-                    />
+                      disabled={registerLookupLoading}
+                      className={`w-full h-10 px-3 rounded-xl bg-[#1d2d25] border text-white text-sm focus:outline-none focus:ring-1 transition-all disabled:opacity-60 disabled:cursor-not-allowed ${registerFieldErrors.department ? 'border-red-500 focus:border-red-500 focus:ring-red-500/50' : 'border-[#28392f] focus:border-primary/50 focus:ring-primary/50'}`}
+                    >
+                      <option value="">{registerLookupLoading ? 'Loading departments...' : 'Select a department'}</option>
+                      {departmentOptions.map((department) => (
+                        <option key={department.id} value={department.name}>
+                          {department.name}
+                        </option>
+                      ))}
+                    </select>
                     {registerFieldErrors.department && <p className="mt-1 text-xs text-red-400">{registerFieldErrors.department}</p>}
                   </div>
                 </div>
               </div>
+
+              {registerLookupError && (
+                <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-red-400 text-[18px]">warning</span>
+                  <span className="text-red-400 text-sm">{registerLookupError}</span>
+                </div>
+              )}
 
               {/* Modal Footer */}
               <div className="flex items-center justify-end gap-3 mt-5 pt-5 border-t border-[#28392f]">

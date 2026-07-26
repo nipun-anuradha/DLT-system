@@ -10,6 +10,7 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminTickets from './pages/admin/AdminTickets'
 import AdminTicketDetail from './pages/admin/AdminTicketDetail'
 import AdminUsers from './pages/admin/AdminUsers'
+import AdminInventory from './pages/admin/AdminInventory'
 import AdminNotices from './pages/admin/AdminNotices'
 import Login from './pages/Login'
 import './App.css'
@@ -52,6 +53,7 @@ function App() {
               <Route path="/admin/tickets" element={<AdminTickets />} />
               <Route path="/admin/tickets/:id" element={<AdminTicketDetail />} />
               <Route path="/admin/users" element={<AdminUsers />} />
+              <Route path="/admin/inventory" element={<AdminInventory />} />
               <Route path="/admin/notices" element={<AdminNotices />} />
             </Route>
             

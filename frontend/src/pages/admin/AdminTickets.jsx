@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AdminSidebar from '../../components/layout/AdminSidebar';
+import { usePolling } from '../../hooks';
 import api from '../../utils/api';
 import { useAuth } from '../../context';
 
@@ -61,6 +62,10 @@ const AdminTickets = () => {
     }
   }, [search, statusFilter]);
 
+  const refreshTickets = useCallback(() => {
+    fetchTickets(pagination.currentPage);
+  }, [fetchTickets, pagination.currentPage]);
+
   // Initial load
   useEffect(() => {
     fetchCounts();
@@ -74,6 +79,8 @@ const AdminTickets = () => {
 
     return () => clearTimeout(debounceTimer);
   }, [search, statusFilter, fetchTickets]);
+
+  usePolling(refreshTickets, 5000);
 
   // Handle page change
   const handlePageChange = (page) => {
@@ -111,6 +118,20 @@ const AdminTickets = () => {
 
   const handleRowClick = (ticketId) => {
     navigate(`/admin/tickets/${ticketId}`);
+  };
+
+  const handleTakeTicket = async (ticketId) => {
+    try {
+      const response = await api.put(`/admin/tickets/${ticketId}/take`, {});
+      if (response.success) {
+        fetchTickets(pagination.currentPage);
+      } else {
+        alert(response.message || 'Failed to take ticket');
+      }
+    } catch (error) {
+      console.error('Error taking ticket:', error);
+      alert(error.message || 'Failed to take ticket');
+    }
   };
 
   // Generate pagination numbers
@@ -347,11 +368,16 @@ const AdminTickets = () => {
                                 </div>
                                 <div className="ml-3">
                                   <div className="text-sm font-medium text-white">{ticket.user?.name || 'Unknown'}</div>
-                                  <div className="text-xs text-[#9cbaa8]">{ticket.user?.department?.name || 'N/A'}</div>
+                                  <div className="text-xs text-[#9cbaa8]">{ticket.user?.department || 'N/A'}</div>
+                                    {ticket.assignedAdmin?.username && (
+                                      <div className="text-[11px] text-amber-400 mt-0.5">
+                                        Taken by {ticket.assignedAdmin.username}
+                                      </div>
+                                    )}
                                 </div>
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[#9cbaa8]">{ticket.user?.branch?.name || 'N/A'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[#9cbaa8]">{ticket.user?.branch || 'N/A'}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-[#9cbaa8]">{formatDate(ticket.date)}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span
@@ -362,6 +388,18 @@ const AdminTickets = () => {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                               <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {ticket.status === 'open' && (
+                                  <button
+                                    className="px-2.5 py-1 text-xs font-medium rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleTakeTicket(ticket.id);
+                                    }}
+                                    title="Take Ticket"
+                                  >
+                                    Take
+                                  </button>
+                                )}
                                 <button
                                   className="p-1 text-[#9cbaa8] hover:text-white transition-colors"
                                   onClick={(e) => {

@@ -19,6 +19,11 @@ const TicketDetail = () => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [previewImages, setPreviewImages] = useState([]);
   const [closing, setClosing] = useState(false);
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+  const [availableAdmins, setAvailableAdmins] = useState([]);
+  const [adminsLoading, setAdminsLoading] = useState(false);
+  const [selectedResolvedAdminId, setSelectedResolvedAdminId] = useState('');
+  const [closeTicketError, setCloseTicketError] = useState('');
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -66,6 +71,38 @@ const TicketDetail = () => {
       fetchTicket(true);
     }
   }, [id, fetchTicket]);
+
+  const fetchAdmins = useCallback(async () => {
+    if (availableAdmins.length > 0) {
+      return;
+    }
+
+    try {
+      setAdminsLoading(true);
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/user/admins`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setAvailableAdmins(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching admins:', error);
+    } finally {
+      setAdminsLoading(false);
+    }
+  }, [availableAdmins.length]);
+
+  useEffect(() => {
+    if (isCloseModalOpen) {
+      fetchAdmins();
+    }
+  }, [isCloseModalOpen, fetchAdmins]);
 
   // Poll for new messages every 10 seconds (only when ticket is not closed)
   usePolling(
@@ -122,6 +159,8 @@ const TicketDetail = () => {
     switch (status) {
       case 'open':
         return 'bg-orange-500/10 text-orange-500 ring-orange-500/20';
+      case 'taken':
+        return 'bg-amber-500/10 text-amber-500 ring-amber-500/20';
       case 'inprogress':
         return 'bg-yellow-500/10 text-yellow-500 ring-yellow-500/20';
       case 'close':
@@ -136,6 +175,8 @@ const TicketDetail = () => {
     switch (status) {
       case 'open':
         return 'Open';
+      case 'taken':
+        return 'Taken';
       case 'inprogress':
         return 'In Progress';
       case 'close':
@@ -239,7 +280,13 @@ const TicketDetail = () => {
 
   // Handle close ticket
   const handleCloseTicket = async () => {
-    if (!window.confirm('Are you sure you want to close this ticket? This action cannot be undone.')) {
+    setCloseTicketError('');
+    setIsCloseModalOpen(true);
+  };
+
+  const handleConfirmCloseTicket = async () => {
+    if (!selectedResolvedAdminId) {
+      setCloseTicketError('Please select the admin who fixed the issue.');
       return;
     }
 
@@ -251,18 +298,21 @@ const TicketDetail = () => {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ resolvedByAdminId: Number(selectedResolvedAdminId) })
       });
 
       const data = await response.json();
       if (data.success) {
-        setTicket(prev => ({ ...prev, status: 'close' }));
+        setIsCloseModalOpen(false);
+        setSelectedResolvedAdminId('');
+        await fetchTicket(false);
       } else {
-        alert(data.message || 'Failed to close ticket');
+        setCloseTicketError(data.message || 'Failed to close ticket');
       }
     } catch (error) {
       console.error('Error closing ticket:', error);
-      alert('Failed to close ticket');
+      setCloseTicketError('Failed to close ticket');
     } finally {
       setClosing(false);
     }
@@ -498,7 +548,65 @@ const TicketDetail = () => {
           <div className="shrink-0 bg-[#16231d] border-t border-[#29382f] p-4">
             <div className="max-w-4xl mx-auto flex items-center justify-center gap-2 text-[#9eb7a8]">
               <span className="material-symbols-outlined">lock</span>
-              <span className="text-sm">This ticket has been closed. You can view the conversation but cannot send new messages.</span>
+              <div className="flex flex-col gap-1 text-sm">
+                <span>This ticket has been closed. You can view the conversation but cannot send new messages.</span>
+                <span className="text-[#9eb7a8]">
+                  Fixed by: <span className="text-white font-medium">{ticket.resolvedByAdmin?.username || 'N/A'}</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isCloseModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsCloseModalOpen(false)} />
+            <div className="relative z-10 w-full max-w-md rounded-2xl border border-[#29382f] bg-[#16231d] shadow-2xl p-6">
+              <h3 className="text-lg font-bold text-white">Close Ticket</h3>
+              <p className="mt-1 text-sm text-[#9eb7a8]">
+                Select the admin who fixed the issue before closing this ticket.
+              </p>
+
+              <div className="mt-5">
+                <label className="block text-sm font-medium text-white mb-2">Fixed by</label>
+                <select
+                  className="w-full rounded-xl border border-[#29382f] bg-[#111c16] px-3 py-2.5 text-white focus:outline-none focus:ring-1 focus:ring-primary"
+                  value={selectedResolvedAdminId}
+                  onChange={(e) => {
+                    setSelectedResolvedAdminId(e.target.value);
+                    setCloseTicketError('');
+                  }}
+                  disabled={adminsLoading}
+                >
+                  <option value="">{adminsLoading ? 'Loading admins...' : 'Select admin'}</option>
+                  {availableAdmins.map((admin) => (
+                    <option key={admin.id} value={admin.id}>
+                      {admin.username}
+                    </option>
+                  ))}
+                </select>
+                {closeTicketError && (
+                  <p className="mt-2 text-sm text-red-400">{closeTicketError}</p>
+                )}
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setIsCloseModalOpen(false)}
+                  className="px-4 py-2 rounded-xl border border-[#29382f] text-[#9eb7a8] hover:text-white hover:bg-[#1f2d25]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmCloseTicket}
+                  disabled={closing}
+                  className="px-4 py-2 rounded-xl bg-primary text-[#102217] font-bold hover:bg-[#32d473] disabled:opacity-50"
+                >
+                  {closing ? 'Closing...' : 'Close Ticket'}
+                </button>
+              </div>
             </div>
           </div>
         )}

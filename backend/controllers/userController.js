@@ -1,17 +1,42 @@
 const { Op } = require('sequelize');
-const { Ticket, Message, User, Admin, Notice } = require('../models/associations');
+const { Ticket, Message, User, Admin, Notice, IssueCategory, IssueSubCategory, IssueDetail } = require('../models/associations');
 const path = require('path');
+
+const ticketListInclude = [
+  {
+    model: User,
+    as: 'user',
+    attributes: ['id', 'name', 'department', 'branch', 'mobile', 'device_type', 'device_model', 'device_specs', 'device_notes']
+  },
+  {
+    model: Admin,
+    as: 'assignedAdmin',
+    attributes: ['id', 'username']
+  },
+  {
+    model: Admin,
+    as: 'resolvedByAdmin',
+    attributes: ['id', 'username']
+  }
+];
 
 // @desc    Create a new ticket
 // @route   POST /api/user/tickets
 // @access  Private (User)
 const createTicket = async (req, res, next) => {
   try {
-    const { subject, category, priority, description } = req.body;
+    const { subject, category, priority, description, issue_category, issue_type, issue_detail } = req.body;
     const user_id = req.user.id;
 
+    const preparedSubject = subject || [issue_category, issue_type, issue_detail].filter(Boolean).join(' / ');
+    const preparedDescription = description || [
+      issue_category ? `Category: ${issue_category}` : null,
+      issue_type ? `Item: ${issue_type}` : null,
+      issue_detail ? `Detail: ${issue_detail}` : null
+    ].filter(Boolean).join('\n');
+
     // Validate required fields
-    if (!subject || !description) {
+    if (!preparedSubject || !preparedDescription) {
       return res.status(400).json({
         success: false,
         message: 'Subject and description are required'
@@ -20,8 +45,11 @@ const createTicket = async (req, res, next) => {
 
     // Create the ticket
     const ticket = await Ticket.create({
-      subject,
-      category: category || 'other',
+      subject: preparedSubject,
+      category: category || issue_category || 'other',
+      issue_category: issue_category || null,
+      issue_type: issue_type || null,
+      issue_detail: issue_detail || null,
       priority: priority || 'low',
       status: 'open',
       user_id,
@@ -33,7 +61,7 @@ const createTicket = async (req, res, next) => {
       ticket_id: ticket.id,
       sender_type: 'user',
       sender_id: user_id,
-      message: description
+      message: preparedDescription
     });
 
     // If there are attachments, create a second message for them
@@ -69,11 +97,7 @@ const createTicket = async (req, res, next) => {
           ],
           order: [['createdAt', 'ASC']]
         },
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'name', 'department', 'branch']
-        }
+        ...ticketListInclude
       ]
     });
 
@@ -81,6 +105,36 @@ const createTicket = async (req, res, next) => {
       success: true,
       message: 'Ticket created successfully',
       data: createdTicket
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get issue selection hierarchy for guided ticket creation
+// @route   GET /api/user/issue-hierarchy
+// @access  Private (User)
+const getIssueHierarchy = async (req, res, next) => {
+  try {
+    const categories = await IssueCategory.findAll({
+      where: { is_active: true },
+      include: [{
+        model: IssueSubCategory,
+        as: 'subCategories',
+        where: { is_active: true },
+        include: [{
+          model: IssueDetail,
+          as: 'details',
+          where: { is_active: true },
+          required: false
+        }]
+      }],
+      order: [['name', 'ASC']]
+    });
+
+    res.json({
+      success: true,
+      data: categories
     });
   } catch (error) {
     next(error);
@@ -113,7 +167,11 @@ const getTickets = async (req, res, next) => {
 
     // Filter by status
     if (status && status !== 'all') {
-      whereClause.status = status;
+      if (status === 'inprogress') {
+        whereClause.status = { [Op.in]: ['inprogress', 'taken'] };
+      } else {
+        whereClause.status = status;
+      }
     }
 
     // Search by id, subject or keyword
@@ -127,13 +185,7 @@ const getTickets = async (req, res, next) => {
     // Get tickets with pagination
     const { count, rows: tickets } = await Ticket.findAndCountAll({
       where: whereClause,
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'name', 'department', 'branch']
-        }
-      ],
+      include: ticketListInclude,
       order: [['date', 'DESC']],
       limit: parseInt(limit),
       offset
@@ -181,11 +233,7 @@ const getTicketById = async (req, res, next) => {
             { model: Admin, as: 'adminSender', attributes: ['id', 'username'] }
           ]
         },
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'name', 'department', 'branch']
-        }
+        ...ticketListInclude
       ],
       order: [[{ model: Message, as: 'messages' }, 'createdAt', 'ASC']]
     });
@@ -217,7 +265,7 @@ const getDashboardCounts = async (req, res, next) => {
     const [total, open, inprogress, closed] = await Promise.all([
       Ticket.count({ where: { user_id } }),
       Ticket.count({ where: { user_id, status: 'open' } }),
-      Ticket.count({ where: { user_id, status: 'inprogress' } }),
+      Ticket.count({ where: { user_id, status: { [Op.in]: ['inprogress', 'taken'] } } }),
       Ticket.count({ where: { user_id, status: 'close' } })
     ]);
 
@@ -361,6 +409,7 @@ const closeTicket = async (req, res, next) => {
   try {
     const { id } = req.params;
     const user_id = req.user.id;
+    const { resolvedByAdminId } = req.body;
 
     // Check if ticket exists and belongs to user
     const ticket = await Ticket.findOne({
@@ -382,13 +431,57 @@ const closeTicket = async (req, res, next) => {
       });
     }
 
+    if (!resolvedByAdminId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please select the admin who fixed the issue'
+      });
+    }
+
+    const resolvedAdmin = await Admin.findByPk(resolvedByAdminId);
+    if (!resolvedAdmin) {
+      return res.status(400).json({
+        success: false,
+        message: 'Selected admin was not found'
+      });
+    }
+
     // Update ticket status to close
-    await ticket.update({ status: 'close' });
+    await ticket.update({
+      status: 'close',
+      resolved_by_admin_id: resolvedAdmin.id,
+      resolved_at: new Date(),
+      assigned_admin_id: ticket.assigned_admin_id || resolvedAdmin.id,
+      assigned_at: ticket.assigned_at || new Date()
+    });
+
+    const closedTicket = await Ticket.findByPk(ticket.id, {
+      include: ticketListInclude
+    });
 
     res.json({
       success: true,
       message: 'Ticket closed successfully',
-      data: ticket
+      data: closedTicket
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get admins for ticket resolution selection
+// @route   GET /api/user/admins
+// @access  Private (User)
+const getAdmins = async (req, res, next) => {
+  try {
+    const admins = await Admin.findAll({
+      attributes: ['id', 'username'],
+      order: [['username', 'ASC']]
+    });
+
+    res.json({
+      success: true,
+      data: admins
     });
   } catch (error) {
     next(error);
@@ -397,10 +490,12 @@ const closeTicket = async (req, res, next) => {
 
 module.exports = {
   createTicket,
+  getIssueHierarchy,
   getTickets,
   getTicketById,
   getDashboardCounts,
   addMessage,
   getNotices,
+  getAdmins,
   closeTicket
 };

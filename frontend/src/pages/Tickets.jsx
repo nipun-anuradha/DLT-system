@@ -116,7 +116,7 @@ const Tickets = () => {
     fetchTickets(pagination.currentPage);
   }, [fetchDashboardCounts, fetchTickets, pagination.currentPage]);
 
-  usePolling(fetchAllData, 30000);
+  usePolling(fetchAllData, 5000);
 
   // Fetch tickets when filters change
   useEffect(() => {

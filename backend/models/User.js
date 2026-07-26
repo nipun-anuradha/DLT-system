@@ -27,6 +27,22 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING(15),
     allowNull: true,
   },
+  device_type: {
+    type: DataTypes.ENUM('laptop', 'desktop', 'tablet', 'mobile', 'other'),
+    allowNull: true,
+  },
+  device_model: {
+    type: DataTypes.STRING(150),
+    allowNull: true,
+  },
+  device_specs: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+  device_notes: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
   department: {
     type: DataTypes.STRING(100),
     allowNull: true,

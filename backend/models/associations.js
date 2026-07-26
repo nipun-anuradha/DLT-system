@@ -9,6 +9,12 @@ const Ticket = require('./Ticket');
 const Message = require('./Message');
 const Notice = require('./Notice');
 const Log = require('./Log');
+const InventoryItem = require('./InventoryItem');
+const InventoryTransfer = require('./InventoryTransfer');
+const AssetType = require('./AssetType');
+const IssueCategory = require('./IssueCategory');
+const IssueSubCategory = require('./IssueSubCategory');
+const IssueDetail = require('./IssueDetail');
 
 // Define Associations
 
@@ -18,10 +24,29 @@ const Log = require('./Log');
 // User - Ticket
 User.hasMany(Ticket, { foreignKey: 'user_id', as: 'tickets' });
 Ticket.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+Ticket.belongsTo(Admin, { foreignKey: 'assigned_admin_id', as: 'assignedAdmin' });
+Ticket.belongsTo(Admin, { foreignKey: 'resolved_by_admin_id', as: 'resolvedByAdmin' });
+
+// User - Inventory
+User.hasMany(InventoryItem, { foreignKey: 'assigned_user_id', as: 'assignedItems' });
+InventoryItem.belongsTo(User, { foreignKey: 'assigned_user_id', as: 'assignedUser' });
+
+// Inventory - Transfers
+InventoryItem.hasMany(InventoryTransfer, { foreignKey: 'inventory_item_id', as: 'transfers' });
+InventoryTransfer.belongsTo(InventoryItem, { foreignKey: 'inventory_item_id', as: 'item' });
+InventoryTransfer.belongsTo(User, { foreignKey: 'from_user_id', as: 'fromUser' });
+InventoryTransfer.belongsTo(User, { foreignKey: 'to_user_id', as: 'toUser' });
+InventoryTransfer.belongsTo(Admin, { foreignKey: 'transferred_by_admin_id', as: 'transferredByAdmin' });
 
 // Ticket - Message
 Ticket.hasMany(Message, { foreignKey: 'ticket_id', as: 'messages' });
 Message.belongsTo(Ticket, { foreignKey: 'ticket_id', as: 'ticket' });
+
+// Issue hierarchy
+IssueCategory.hasMany(IssueSubCategory, { foreignKey: 'category_id', as: 'subCategories' });
+IssueSubCategory.belongsTo(IssueCategory, { foreignKey: 'category_id', as: 'category' });
+IssueSubCategory.hasMany(IssueDetail, { foreignKey: 'sub_category_id', as: 'details' });
+IssueDetail.belongsTo(IssueSubCategory, { foreignKey: 'sub_category_id', as: 'subCategory' });
 
 // User - Message (for message sender when sender_type is 'user')
 User.hasMany(Message, { foreignKey: 'sender_id', constraints: false, as: 'sentMessages' });
@@ -52,5 +77,11 @@ module.exports = {
   Ticket,
   Message,
   Notice,
-  Log
+  Log,
+  InventoryItem,
+  InventoryTransfer,
+  AssetType,
+  IssueCategory,
+  IssueSubCategory,
+  IssueDetail
 };

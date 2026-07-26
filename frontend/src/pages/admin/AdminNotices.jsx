@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import AdminSidebar from '../../components/layout/AdminSidebar';
+import { usePolling } from '../../hooks';
 import { apiRequest } from '../../utils/api';
 
 const AdminNotices = () => {
@@ -56,6 +57,8 @@ const AdminNotices = () => {
   useEffect(() => {
     fetchNotices();
   }, []);
+
+  usePolling(() => fetchNotices(pagination.currentPage), 5000);
 
   // Handle page change
   const handlePageChange = (newPage) => {

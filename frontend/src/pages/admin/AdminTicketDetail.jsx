@@ -71,7 +71,7 @@ const AdminTicketDetail = () => {
   // Poll for new messages every 10 seconds (only when ticket is not closed)
   usePolling(
     fetchTicket,
-    10000,
+    5000,
     !!id && ticket?.status !== 'close'
   );
 
@@ -123,6 +123,8 @@ const AdminTicketDetail = () => {
     switch (status) {
       case 'open':
         return 'bg-orange-500/10 text-orange-500 border-orange-500/20';
+      case 'taken':
+        return 'bg-amber-500/10 text-amber-500 border-amber-500/20';
       case 'inprogress':
         return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20';
       case 'close':
@@ -137,6 +139,8 @@ const AdminTicketDetail = () => {
     switch (status) {
       case 'open':
         return 'Open';
+      case 'taken':
+        return 'Taken';
       case 'inprogress':
         return 'In Progress';
       case 'close':
@@ -263,6 +267,34 @@ const AdminTicketDetail = () => {
     } catch (error) {
       console.error('Error closing ticket:', error);
       alert('Failed to close ticket');
+    }
+  };
+
+  const openUserInventory = () => {
+    if (!ticket?.user?.id) return;
+    navigate(`/admin/inventory?userId=${ticket.user.id}`);
+  };
+
+  const handleTakeTicket = async () => {
+    try {
+      const token = getAdminToken();
+      const response = await fetch(`${API_BASE_URL}/admin/tickets/${id}/take`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        await fetchTicket(false);
+      } else {
+        alert(data.message || 'Failed to take ticket');
+      }
+    } catch (error) {
+      console.error('Error taking ticket:', error);
+      alert('Failed to take ticket');
     }
   };
 
@@ -397,12 +429,21 @@ const AdminTicketDetail = () => {
               </span>
             </div>
             <p className="hidden md:block text-sm text-[#9cbaa8] truncate max-w-md">
-              {ticket.subject} {ticket.user?.department?.name && `- ${ticket.user.department.name}`}
+              {ticket.subject} {ticket.user?.department && `- ${ticket.user.department}`}
             </p>
           </div>
 
           {/* Right: Close Button */}
           <div className="flex items-center gap-4">
+            {!isClosed && ticket.status === 'open' && (
+              <button 
+                onClick={handleTakeTicket}
+                className="flex items-center gap-2 text-sm font-medium text-amber-400 bg-amber-500/10 hover:bg-amber-500/20 px-4 py-2 rounded-lg transition-colors border border-amber-500/20"
+              >
+                <span className="material-symbols-outlined text-lg">assignment_ind</span>
+                <span className="hidden sm:inline">Take Ticket</span>
+              </button>
+            )}
             {!isClosed && (
               <button 
                 onClick={handleCloseTicket}
@@ -426,7 +467,13 @@ const AdminTicketDetail = () => {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-[#9cbaa8] text-lg">person</span>
             <span className="text-[#9cbaa8]">User:</span>
-            <span className="text-white">{ticket.user?.name || 'Unknown'}</span>
+            <button
+              type="button"
+              onClick={openUserInventory}
+              className="text-white font-medium hover:text-primary transition-colors"
+            >
+              {ticket.user?.name || 'Unknown'}
+            </button>
           </div>
           {ticket.user?.emp_no && (
             <div className="flex items-center gap-2">
@@ -435,10 +482,38 @@ const AdminTicketDetail = () => {
               <span className="text-white">{ticket.user.emp_no}</span>
             </div>
           )}
-          {ticket.user?.branch?.name && (
+          {ticket.user?.branch && (
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[#9cbaa8] text-lg">location_on</span>
-              <span className="text-white">{ticket.user.branch.name}</span>
+              <span className="text-white">{ticket.user.branch}</span>
+            </div>
+          )}
+          {(ticket.user?.device_type || ticket.user?.device_model || ticket.user?.device_specs) && (
+            <div className="flex items-start gap-2">
+              <span className="material-symbols-outlined text-[#9cbaa8] text-lg">devices</span>
+              <div className="flex flex-col">
+                <span className="text-[#9cbaa8] text-xs uppercase tracking-wider">Device</span>
+                <span className="text-white">
+                  {ticket.user?.device_type || 'device'}{ticket.user?.device_model ? ` • ${ticket.user.device_model}` : ''}
+                </span>
+                {ticket.user?.device_specs && (
+                  <span className="text-[#9cbaa8] text-xs whitespace-pre-line mt-1">{ticket.user.device_specs}</span>
+                )}
+              </div>
+            </div>
+          )}
+          {ticket.assignedAdmin?.username && (
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#9cbaa8] text-lg">assignment_ind</span>
+              <span className="text-[#9cbaa8]">Taken by:</span>
+              <span className="text-white">{ticket.assignedAdmin.username}</span>
+            </div>
+          )}
+          {ticket.resolvedByAdmin?.username && (
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[#9cbaa8] text-lg">verified</span>
+              <span className="text-[#9cbaa8]">Fixed by:</span>
+              <span className="text-white">{ticket.resolvedByAdmin.username}</span>
             </div>
           )}
           {ticket.category && (
@@ -546,9 +621,10 @@ const AdminTicketDetail = () => {
         {/* Closed Ticket Notice */}
         {isClosed && (
           <div className="border-t border-[#273a2f] bg-[#1a2821] p-4">
-            <div className="max-w-4xl mx-auto flex items-center justify-center gap-2 text-[#9cbaa8]">
+            <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-center gap-2 text-[#9cbaa8]">
               <span className="material-symbols-outlined">lock</span>
               <span className="text-sm">This ticket has been closed. You can view the conversation but cannot send new messages.</span>
+              <span className="text-sm text-white sm:ml-2">Fixed by: {ticket.resolvedByAdmin?.username || 'N/A'}</span>
             </div>
           </div>
         )}

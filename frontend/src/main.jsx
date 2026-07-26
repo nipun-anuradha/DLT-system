@@ -6,6 +6,12 @@ import { msalConfig } from './config/msalConfig'
 import './index.css'
 import App from './App.jsx'
 
+console.log("Secure Context:", window.isSecureContext);
+console.log("Crypto:", window.crypto);
+console.log("Crypto subtle:", window.crypto?.subtle);
+console.log("Redirect URL:", import.meta.env.VITE_REDIRECT_URL);
+
+
 // Initialize MSAL instance
 const msalInstance = new PublicClientApplication(msalConfig);
 

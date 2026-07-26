@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import AdminSidebar from "../../components/layout/AdminSidebar";
-import { apiRequest } from "../../utils/api";
+import { apiRequest, api } from "../../utils/api";
 import * as Yup from "yup";
 import { useAuth } from "../../context";
+import { usePolling } from "../../hooks";
 
 // Validation schema for creating user
 const createUserValidationSchema = Yup.object().shape({
@@ -76,6 +77,11 @@ const AdminUsers = () => {
 
   // Users data state
   const [users, setUsers] = useState([]);
+  const [branchOptions, setBranchOptions] = useState([]);
+  const [departmentOptions, setDepartmentOptions] = useState([]);
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [pagination, setPagination] = useState({
@@ -136,6 +142,38 @@ const AdminUsers = () => {
   useEffect(() => {
     fetchUsers();
   }, []);
+
+  usePolling(() => fetchUsers(pagination.currentPage, searchQuery), 5000);
+
+  useEffect(() => {
+    const loadRegistrationLookup = async () => {
+      if (!isUserModalOpen) {
+        return;
+      }
+      if (branchOptions.length > 0 && departmentOptions.length > 0) {
+        return;
+      }
+
+      setLookupLoading(true);
+      setLookupError("");
+
+      try {
+        const response = await api.get("/public/registration-data");
+        if (response.success) {
+          setBranchOptions(response.data?.branches || []);
+          setDepartmentOptions(response.data?.departments || []);
+        } else {
+          setLookupError(response.message || "Failed to load branch and department options");
+        }
+      } catch (error) {
+        setLookupError(error.message || "Failed to load branch and department options");
+      } finally {
+        setLookupLoading(false);
+      }
+    };
+
+    loadRegistrationLookup();
+  }, [isUserModalOpen, branchOptions.length, departmentOptions.length]);
 
   // Handle search with debounce
   useEffect(() => {
@@ -529,7 +567,9 @@ const AdminUsers = () => {
                             {user.id}
                           </td>
                           <td className="p-4 text-white font-medium">
-                            {user.name || "-"}
+                            <div className="flex flex-col">
+                              <span>{user.name || "-"}</span>
+                            </div>
                           </td>
                           <td className="p-4 text-[#9cbaa8]">
                             {user.username}
@@ -869,18 +909,24 @@ const AdminUsers = () => {
                     <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
                       Branch
                     </label>
-                    <input
-                      type="text"
+                    <select
                       name="branch"
                       value={formData.branch}
                       onChange={handleInputChange}
-                      className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${
+                      disabled={lookupLoading}
+                      className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white focus:outline-none focus:ring-1 transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
                         fieldErrors.branch
                           ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
                           : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
                       }`}
-                      placeholder="Enter branch"
-                    />
+                    >
+                      <option value="">{lookupLoading ? "Loading branches..." : "Select branch"}</option>
+                      {branchOptions.map((branch) => (
+                        <option key={branch.id} value={branch.name}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
                     {fieldErrors.branch && (
                       <p className="mt-1 text-xs text-red-400">
                         {fieldErrors.branch}
@@ -891,18 +937,24 @@ const AdminUsers = () => {
                     <label className="block text-sm font-medium text-[#9cbaa8] mb-2">
                       Department
                     </label>
-                    <input
-                      type="text"
+                    <select
                       name="department"
                       value={formData.department}
                       onChange={handleInputChange}
-                      className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white placeholder-[#5a7063] focus:outline-none focus:ring-1 transition-all ${
+                      disabled={lookupLoading}
+                      className={`w-full h-11 px-4 rounded-xl bg-[#1d2d25] border text-white focus:outline-none focus:ring-1 transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
                         fieldErrors.department
                           ? "border-red-500 focus:border-red-500 focus:ring-red-500/50"
                           : "border-[#28392f] focus:border-primary/50 focus:ring-primary/50"
                       }`}
-                      placeholder="Enter department"
-                    />
+                    >
+                      <option value="">{lookupLoading ? "Loading departments..." : "Select department"}</option>
+                      {departmentOptions.map((department) => (
+                        <option key={department.id} value={department.name}>
+                          {department.name}
+                        </option>
+                      ))}
+                    </select>
                     {fieldErrors.department && (
                       <p className="mt-1 text-xs text-red-400">
                         {fieldErrors.department}

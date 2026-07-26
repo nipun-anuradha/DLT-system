@@ -18,6 +18,7 @@ const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
     if (location.pathname === "/admin/dashboard") return "dashboard";
     if (location.pathname.startsWith("/admin/tickets")) return "tickets";
     if (location.pathname.startsWith("/admin/users")) return "users";
+    if (location.pathname.startsWith("/admin/inventory")) return "inventory";
     if (location.pathname.startsWith("/admin/notices")) return "notices";
     if (location.pathname.startsWith("/admin/settings")) return "settings";
     return "";
@@ -122,6 +123,31 @@ const AdminSidebar = ({ isOpen = false, onClose = () => {} }) => {
               } leading-normal`}
             >
               Users
+            </p>
+          </Link>
+
+          <Link
+            onClick={onClose}
+            className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${
+              activePage === "inventory"
+                ? "bg-primary/10 border border-primary/20 text-primary"
+                : "text-[#9cbaa8] hover:bg-[#28392f] hover:text-white"
+            }`}
+            to="/admin/inventory"
+          >
+            <span
+              className={`material-symbols-outlined ${
+                activePage === "inventory" ? "fill" : ""
+              }`}
+            >
+              inventory_2
+            </span>
+            <p
+              className={`text-sm ${
+                activePage === "inventory" ? "font-bold" : "font-medium"
+              } leading-normal`}
+            >
+              Inventory
             </p>
           </Link>
 

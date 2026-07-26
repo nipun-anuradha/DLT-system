@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const { getRegistrationData } = require('../controllers/publicController');
 
 // Public routes - no authentication required
-// Note: Branch and Department endpoints removed as they are now strings in User model
+router.get('/registration-data', getRegistrationData);
 
 module.exports = router;

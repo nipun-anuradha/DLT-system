@@ -64,7 +64,7 @@ const AdminDashboard = () => {
     fetchRecentTickets(activeFilter);
   }, [fetchCounts, fetchRecentTickets, activeFilter]);
 
-  usePolling(fetchDashboardData, 30000);
+  usePolling(fetchDashboardData, 5000);
 
   // Handle filter change
   const handleFilterChange = (status) => {
@@ -260,6 +260,27 @@ const AdminDashboard = () => {
                   <h3 className="text-white text-2xl font-bold">{stat.value}</h3>
                 </div>
               ))}
+            </div>
+
+            <div className="bg-gradient-to-r from-[#132419] via-[#16281c] to-[#1b3323] border border-[#28392f] rounded-2xl p-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-4">
+                <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <span className="material-symbols-outlined text-primary">inventory_2</span>
+                </div>
+                <div>
+                  <h3 className="text-white text-lg font-bold">Inventory and Device Management</h3>
+                  <p className="text-[#9cbaa8] text-sm max-w-2xl">
+                    Track PCs, printers, mobile devices, and dongles. Review assignment history and user device specs from one place.
+                  </p>
+                </div>
+              </div>
+              <button
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-[#102217] font-bold hover:bg-[#32d473] transition-colors"
+                onClick={() => navigate('/admin/inventory')}
+              >
+                <span className="material-symbols-outlined text-[20px]">open_in_new</span>
+                Open Inventory
+              </button>
             </div>
 
             {/* Recent Tickets Table */}
