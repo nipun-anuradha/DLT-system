@@ -68,7 +68,7 @@ const authenticateAdmin = async (req, res, next) => {
 
     // Verify admin still exists in database
     const admin = await Admin.findByPk(decoded.id, {
-      attributes: ['id', 'username']
+      attributes: ['id', 'username', 'is_super']
     });
 
     if (!admin) {

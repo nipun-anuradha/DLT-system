@@ -129,7 +129,7 @@ const NewTicket = () => {
         return;
       }
 
-      subject = `${selectedCategoryMeta.label} / ${selectedItemMeta.label} / ${selectedIssueMeta.label}`;
+      subject = `${selectedCategoryMeta.name} / ${selectedItemMeta.name} / ${selectedIssueMeta.name}`;
       description = `Selected issue: ${subject}. Please assist with this request.`;
       category = selectedCategory;
       issueCategory = selectedCategory;

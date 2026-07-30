@@ -250,11 +250,12 @@ const loginAdmin = async (req, res, next) => {
       });
     }
 
-    // Generate token with admin role
+    // Generate token with admin role and super status
     const token = generateToken({
       id: admin.id,
       username: admin.username,
-      role: 'admin'
+      role: 'admin',
+      is_super: admin.is_super || false
     });
 
     // Log the admin login
@@ -266,7 +267,8 @@ const loginAdmin = async (req, res, next) => {
       message: 'Admin login successful',
       data: {
         id: admin.id,
-        username: admin.username
+        username: admin.username,
+        is_super: admin.is_super || false
       },
       token
     });

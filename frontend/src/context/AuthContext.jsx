@@ -27,7 +27,11 @@ export const AuthProvider = ({ children }) => {
 
     if (storedAdminToken && storedAdmin) {
       setAdminToken(storedAdminToken);
-      setAdmin(JSON.parse(storedAdmin));
+      const parsedAdmin = JSON.parse(storedAdmin);
+      setAdmin({
+        ...parsedAdmin,
+        is_super: parsedAdmin.is_super || false
+      });
     }
 
     setLoading(false);
@@ -43,10 +47,14 @@ export const AuthProvider = ({ children }) => {
 
   // Admin Login function
   const adminLogin = (adminData, authToken) => {
-    setAdmin(adminData);
+    const normalizedAdmin = {
+      ...adminData,
+      is_super: adminData.is_super || false
+    };
+    setAdmin(normalizedAdmin);
     setAdminToken(authToken);
     localStorage.setItem(STORAGE_KEYS.ADMIN_TOKEN, authToken);
-    localStorage.setItem(STORAGE_KEYS.ADMIN_DATA, JSON.stringify(adminData));
+    localStorage.setItem(STORAGE_KEYS.ADMIN_DATA, JSON.stringify(normalizedAdmin));
   };
 
   // User Logout function

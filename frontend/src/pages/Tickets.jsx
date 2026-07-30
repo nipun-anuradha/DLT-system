@@ -10,6 +10,7 @@ const Tickets = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [tickets, setTickets] = useState([]);
   const [ticketsLoading, setTicketsLoading] = useState(true);
+  const [isTicketsRefreshing, setIsTicketsRefreshing] = useState(false);
   const [pagination, setPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -81,8 +82,13 @@ const Tickets = () => {
   }, [fetchDashboardCounts]);
 
   // Fetch tickets with filters and pagination
-  const fetchTickets = useCallback(async (page = 1) => {
-    setTicketsLoading(true);
+  const fetchTickets = useCallback(async (page = 1, { background = false } = {}) => {
+    if (background) {
+      setIsTicketsRefreshing(true);
+    } else {
+      setTicketsLoading(true);
+    }
+
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -106,14 +112,18 @@ const Tickets = () => {
     } catch (error) {
       console.error('Failed to fetch tickets:', error);
     } finally {
-      setTicketsLoading(false);
+      if (background) {
+        setIsTicketsRefreshing(false);
+      } else {
+        setTicketsLoading(false);
+      }
     }
   }, [activeFilter, statusFilter, searchQuery]);
 
   // Poll for updates every 30 seconds
   const fetchAllData = useCallback(() => {
     fetchDashboardCounts();
-    fetchTickets(pagination.currentPage);
+    fetchTickets(pagination.currentPage, { background: true });
   }, [fetchDashboardCounts, fetchTickets, pagination.currentPage]);
 
   usePolling(fetchAllData, 5000);
@@ -126,11 +136,11 @@ const Tickets = () => {
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchTickets(1);
+      fetchTickets(1, { background: tickets.length > 0 });
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, tickets.length]);
 
   // Handle page change
   const handlePageChange = (page) => {
@@ -330,6 +340,9 @@ const Tickets = () => {
 
             {/* Table Section */}
             <section className="w-full overflow-hidden rounded-lg border border-gray-200 dark:border-[#29382f] bg-white dark:bg-[#1c2e24] shadow-sm">
+              <div className={`px-6 py-3 text-sm text-slate-500 dark:text-slate-400 bg-gray-50 dark:bg-[#15231b] border-b border-gray-200 dark:border-[#29382f] transition-opacity duration-200 ${isTicketsRefreshing && !ticketsLoading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                Refreshing tickets...
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[800px]">
                   <thead className="bg-gray-50 dark:bg-[#15231b]">

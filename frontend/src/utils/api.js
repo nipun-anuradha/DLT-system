@@ -25,6 +25,20 @@ export const removeAdminToken = () => {
   localStorage.removeItem(STORAGE_KEYS.ADMIN_DATA);
 };
 
+const handleAuthError = (endpoint, status) => {
+  const isAdmin = isAdminRoute(endpoint);
+
+  if (status === 401 || status === 403) {
+    if (isAdmin) {
+      removeAdminToken();
+      window.location.href = '/admin';
+    } else {
+      removeAuthToken();
+      window.location.href = '/login';
+    }
+  }
+};
+
 // Check if endpoint is an admin route
 const isAdminRoute = (endpoint) => {
   return endpoint.startsWith('/admin') || endpoint.includes('/admin/');
@@ -55,6 +69,7 @@ export const apiRequest = async (endpoint, options = {}) => {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
     
     if (!response.ok) {
+      handleAuthError(endpoint, response.status);
       const error = await response.json();
       throw new Error(error.message || 'Something went wrong');
     }

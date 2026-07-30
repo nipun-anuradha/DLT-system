@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateAdmin } = require('../middleware/auth');
-const { upload, handleUploadError } = require('../middleware/upload');
+const { upload, csvUpload, handleUploadError } = require('../middleware/upload');
 const {
   // Dashboard
   getDashboardCounts,
@@ -15,6 +15,8 @@ const {
   getInventoryItemHistory,
   createInventoryItem,
   updateInventoryItem,
+  importInventoryItems,
+  exportInventoryItemsCsv,
   transferInventoryItem,
   // Tickets
   getAllTickets,
@@ -22,6 +24,7 @@ const {
   updateTicket,
   takeTicket,
   addAdminMessage,
+  getAllAdmins,
   // Users
   getAllUsers,
   getUserById,
@@ -53,6 +56,8 @@ router.get('/inventory/items/:id/history', getInventoryItemHistory);
 router.get('/inventory/users/:id/history', getInventoryUserHistory);
 router.post('/inventory/items', createInventoryItem);
 router.put('/inventory/items/:id', updateInventoryItem);
+router.post('/inventory/import', csvUpload.single('file'), handleUploadError, importInventoryItems);
+router.get('/inventory/export', exportInventoryItemsCsv);
 router.post('/inventory/items/:id/transfer', transferInventoryItem);
 
 // ==================== TICKETS ====================
@@ -61,6 +66,7 @@ router.get('/tickets/:id', getTicketById);
 router.put('/tickets/:id', updateTicket);
 router.put('/tickets/:id/take', takeTicket);
 router.post('/tickets/:id/messages', upload.array('attachments', 5), handleUploadError, addAdminMessage);
+router.get('/admins', getAllAdmins);
 
 // ==================== USERS ====================
 router.get('/users', getAllUsers);

@@ -21,7 +21,7 @@ const createUserValidationSchema = Yup.object().shape({
     .required("Please confirm your password")
     .oneOf([Yup.ref("password")], "Passwords must match"),
   mobile: Yup.string()
-    .matches(/^$|^\d{10}$/, "Mobile number must be exactly 10 digits")
+    .matches(/^$|^\d{11}$/, "Mobile number must be exactly 10 digits")
     .nullable(),
   branch: Yup.string()
     .max(100, "Branch must not exceed 100 characters")
@@ -52,7 +52,7 @@ const editUserValidationSchema = Yup.object().shape({
       return value === password;
     }),
   mobile: Yup.string()
-    .matches(/^$|^\d{10}$/, "Mobile number must be exactly 10 digits")
+    .matches(/^$|^\d{11}$/, "Mobile number must be exactly 10 digits")
     .nullable(),
   branch: Yup.string()
     .max(100, "Branch must not exceed 100 characters")
@@ -83,6 +83,7 @@ const AdminUsers = () => {
   const [lookupError, setLookupError] = useState("");
 
   const [loading, setLoading] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [pagination, setPagination] = useState({
     currentPage: 1,
@@ -110,8 +111,13 @@ const AdminUsers = () => {
   const { admin } = useAuth();
 
   // Fetch users from API
-  const fetchUsers = async (page = 1, search = "") => {
-    setLoading(true);
+  const fetchUsers = async (page = 1, search = "", { background = false } = {}) => {
+    if (background) {
+      setIsFetching(true);
+    } else {
+      setLoading(true);
+    }
+
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -134,7 +140,11 @@ const AdminUsers = () => {
       console.error("Failed to fetch users:", error);
       setUsers([]);
     } finally {
-      setLoading(false);
+      if (background) {
+        setIsFetching(false);
+      } else {
+        setLoading(false);
+      }
     }
   };
 
@@ -143,7 +153,7 @@ const AdminUsers = () => {
     fetchUsers();
   }, []);
 
-  usePolling(() => fetchUsers(pagination.currentPage, searchQuery), 5000);
+  usePolling(() => fetchUsers(pagination.currentPage, searchQuery, { background: true }), 5000);
 
   useEffect(() => {
     const loadRegistrationLookup = async () => {
@@ -178,15 +188,15 @@ const AdminUsers = () => {
   // Handle search with debounce
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
-      fetchUsers(1, searchQuery);
+      fetchUsers(1, searchQuery, { background: users.length > 0 });
     }, 300);
     return () => clearTimeout(debounceTimer);
-  }, [searchQuery]);
+  }, [searchQuery, users.length]);
 
   // Handle page change
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
-      fetchUsers(newPage, searchQuery);
+      fetchUsers(newPage, searchQuery, { background: users.length > 0 });
     }
   };
 
@@ -487,6 +497,9 @@ const AdminUsers = () => {
 
             {/* Data Table */}
             <div className="rounded-2xl border border-[#28392f] bg-surface-dark overflow-hidden shadow-lg">
+              <div className={`px-6 py-3 text-xs text-[#9cbaa8] border-b border-[#28392f] bg-[#111814] transition-opacity duration-200 ${isFetching && !loading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                Refreshing users...
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>

@@ -9,6 +9,7 @@ const AdminTickets = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [pagination, setPagination] = useState({
@@ -40,8 +41,11 @@ const AdminTickets = () => {
   };
 
   // Fetch tickets
-  const fetchTickets = useCallback(async (page = 1) => {
-    setLoading(true);
+  const fetchTickets = useCallback(async (page = 1, opts = { background: false }) => {
+    const { background } = opts;
+    if (background) setIsRefreshing(true);
+    else setLoading(true);
+
     try {
       const params = new URLSearchParams({
         page: page.toString(),
@@ -58,12 +62,13 @@ const AdminTickets = () => {
     } catch (error) {
       console.error('Error fetching tickets:', error);
     } finally {
-      setLoading(false);
+      if (background) setIsRefreshing(false);
+      else setLoading(false);
     }
   }, [search, statusFilter]);
 
   const refreshTickets = useCallback(() => {
-    fetchTickets(pagination.currentPage);
+    fetchTickets(pagination.currentPage, { background: true });
   }, [fetchTickets, pagination.currentPage]);
 
   // Initial load
@@ -74,11 +79,11 @@ const AdminTickets = () => {
   // Fetch tickets when filters change
   useEffect(() => {
     const debounceTimer = setTimeout(() => {
-      fetchTickets(1);
+      fetchTickets(1, { background: tickets.length > 0 });
     }, 300);
 
     return () => clearTimeout(debounceTimer);
-  }, [search, statusFilter, fetchTickets]);
+  }, [search, statusFilter, fetchTickets, tickets.length]);
 
   usePolling(refreshTickets, 5000);
 
@@ -203,7 +208,7 @@ const AdminTickets = () => {
             <div className="flex items-center gap-3 pl-4 border-l border-[#28392f]">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-white">{admin?.username || 'Admin'}</p>
-                <p className="text-xs text-[#9cbaa8]">Administrator</p>
+                <p className="text-xs text-[#9cbaa8]">{admin?.is_super ? 'Super Admin' : 'Administrator'}</p>
               </div>
               <div className="relative size-10 rounded-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center border-2 border-[#28392f] shadow-lg">
                 <span className="material-symbols-outlined text-white text-xl">person</span>
@@ -245,7 +250,7 @@ const AdminTickets = () => {
                 </div>
                 <input
                   className="block w-full pl-10 pr-3 py-2.5 border border-[#273a2f] rounded-lg leading-5 bg-background-dark text-white placeholder-[#9cbaa8] focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition-all shadow-inner"
-                  placeholder="Search by ID, Subject, or User..."
+                  placeholder="Search by ID, Subject, User, or Branch..."
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -280,6 +285,9 @@ const AdminTickets = () => {
 
             {/* Ticket Table */}
             <div className="bg-surface-dark rounded-xl border border-[#273a2f] shadow-lg overflow-hidden flex flex-col">
+              <div className={`px-6 py-3 text-sm text-[#9cbaa8] border-b border-[#273a2f] bg-[#111814] transition-opacity duration-200 ${isRefreshing && !loading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                Refreshing tickets...
+              </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-[#273a2f]">
                   <thead className="bg-[#1e3b2b]/50">

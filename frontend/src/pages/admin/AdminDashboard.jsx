@@ -199,7 +199,7 @@ const AdminDashboard = () => {
             <div className="flex items-center gap-3 pl-4 border-l border-[#28392f]">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-white">{admin?.username || 'Admin'}</p>
-                <p className="text-xs text-[#9cbaa8]">Administrator</p>
+                <p className="text-xs text-[#9cbaa8]">{admin?.is_super ? 'Super Admin' : 'Administrator'}</p>
               </div>
               <div className="relative size-10 rounded-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center border-2 border-[#28392f] shadow-lg">
                 <span className="material-symbols-outlined text-white text-xl">person</span>

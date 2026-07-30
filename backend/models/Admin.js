@@ -17,6 +17,11 @@ const Admin = sequelize.define('Admin', {
   password: {
     type: DataTypes.STRING(255),
     allowNull: false,
+  },
+  is_super: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
   }
 }, {
   tableName: 'admin',

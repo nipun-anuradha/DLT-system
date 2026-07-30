@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AdminSidebar from '../../components/layout/AdminSidebar';
 import { useAuth } from '../../context';
 import { usePolling } from '../../hooks';
-import api from '../../utils/api';
+import api, { getAdminToken } from '../../utils/api';
+import { API_BASE_URL } from '../../utils/constants';
+import { branchValuesMatch, normalizeBranchValue } from '../../utils/locationUtils.mjs';
 
 const typeLabels = {
   pc: 'PC',
@@ -77,6 +79,7 @@ const AdminInventory = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [summary, setSummary] = useState({
     totalItems: 0,
     availableItems: 0,
@@ -87,6 +90,8 @@ const AdminInventory = () => {
   });
   const [items, setItems] = useState([]);
   const [users, setUsers] = useState([]);
+  const [branchOptions, setBranchOptions] = useState([]);
+  const [departmentOptions, setDepartmentOptions] = useState([]);
   const [assetTypes, setAssetTypes] = useState([]);
   const [assetTypesLoading, setAssetTypesLoading] = useState(false);
   const [assetTypesError, setAssetTypesError] = useState('');
@@ -95,7 +100,6 @@ const AdminInventory = () => {
   const [selectedItemHistory, setSelectedItemHistory] = useState(null);
   const [selectedUserHistory, setSelectedUserHistory] = useState(null);
   const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
@@ -110,15 +114,20 @@ const AdminInventory = () => {
   const [transferForm, setTransferForm] = useState(defaultTransferForm);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+  const [importingCsv, setImportingCsv] = useState(false);
+  const [importFeedback, setImportFeedback] = useState({ type: '', message: '' });
+  const fileInputRef = useRef(null);
   const { admin } = useAuth();
 
   const filteredBranches = useMemo(() => {
+    if (branchOptions && branchOptions.length > 0) return branchOptions;
     return [...new Set(users.map((user) => user.branch).filter(Boolean))].sort();
-  }, [users]);
+  }, [users, branchOptions]);
 
   const filteredDepartments = useMemo(() => {
+    if (departmentOptions && departmentOptions.length > 0) return departmentOptions;
     return [...new Set(users.map((user) => user.department).filter(Boolean))].sort();
-  }, [users]);
+  }, [users, departmentOptions]);
   
   const modelOptions = useMemo(() => {
     return [...new Set(items.map((item) => item.model).filter(Boolean))].sort();
@@ -137,7 +146,7 @@ const AdminInventory = () => {
 
   const availableUsersForItem = useMemo(() => {
     return users.filter((u) => {
-      if (itemForm.assigned_branch && u.branch !== itemForm.assigned_branch) return false;
+      if (itemForm.assigned_branch && !branchValuesMatch(u.branch, itemForm.assigned_branch)) return false;
       if (itemForm.assigned_department && u.department !== itemForm.assigned_department) return false;
       return true;
     });
@@ -145,7 +154,7 @@ const AdminInventory = () => {
 
   const availableUsersForTransfer = useMemo(() => {
     return users.filter((u) => {
-      if (transferForm.to_branch && u.branch !== transferForm.to_branch) return false;
+      if (transferForm.to_branch && !branchValuesMatch(u.branch, transferForm.to_branch)) return false;
       if (transferForm.to_department && u.department !== transferForm.to_department) return false;
       return true;
     });
@@ -183,27 +192,51 @@ const AdminInventory = () => {
     }
   }, []);
 
-  const fetchItems = useCallback(async () => {
+  const fetchRegistrationData = useCallback(async () => {
+    try {
+      const response = await api.get('/public/registration-data');
+      if (response.success) {
+        const branches = (response.data?.branches || []).map((b) => b.name).filter(Boolean).sort();
+        const departments = (response.data?.departments || []).map((d) => d.name).filter(Boolean).sort();
+        setBranchOptions(branches);
+        setDepartmentOptions(departments);
+      }
+    } catch (error) {
+      // ignore - we'll fall back to deriving from users
+    }
+  }, []);
+
+  const fetchItems = useCallback(async (opts = { background: false }) => {
+    const { background } = opts;
+    if (background) {
+      setIsRefreshing(true);
+    }
+
     const params = new URLSearchParams({ page: '1', limit: '100' });
-    if (search) params.append('search', search);
+    const query = searchInput.trim();
+    if (query) params.append('search', query);
     if (typeFilter !== 'all') params.append('type', typeFilter);
     if (statusFilter !== 'all') params.append('status', statusFilter);
     if (branchFilter !== 'all') params.append('branch', branchFilter);
     if (departmentFilter !== 'all') params.append('department', departmentFilter);
     if (userFilter) params.append('userId', userFilter);
 
-    const response = await api.get(`/admin/inventory/items?${params.toString()}`);
-    if (response.success) {
-      const nextItems = response.data || [];
-      setItems(nextItems);
-      setSelectedItem((currentSelectedItem) => {
-        if (currentSelectedItem && nextItems.some((item) => item.id === currentSelectedItem.id)) {
-          return currentSelectedItem;
-        }
-        return nextItems[0] || null;
-      });
+    try {
+      const response = await api.get(`/admin/inventory/items?${params.toString()}`);
+      if (response.success) {
+        const nextItems = response.data || [];
+        setItems(nextItems);
+        setSelectedItem((currentSelectedItem) => {
+          if (currentSelectedItem && nextItems.some((item) => item.id === currentSelectedItem.id)) {
+            return currentSelectedItem;
+          }
+          return nextItems[0] || null;
+        });
+      }
+    } finally {
+      if (background) setIsRefreshing(false);
     }
-  }, [branchFilter, departmentFilter, search, statusFilter, typeFilter, userFilter]);
+  }, [branchFilter, departmentFilter, searchInput, statusFilter, typeFilter, userFilter]);
 
   const fetchSelectedItemHistory = useCallback(async (itemId) => {
     if (!itemId) {
@@ -229,18 +262,19 @@ const AdminInventory = () => {
     }
   }, []);
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
-    try {
-      await Promise.all([fetchSummary(), fetchUsers(), fetchItems(), fetchAssetTypes()]);
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchAssetTypes, fetchItems, fetchSummary, fetchUsers]);
-
   useEffect(() => {
+    const loadAll = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([fetchSummary(), fetchUsers(), fetchItems(), fetchAssetTypes(), fetchRegistrationData()]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadAll();
-  }, [loadAll]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const userIdFromQuery = searchParams.get('userId');
@@ -265,19 +299,11 @@ const AdminInventory = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setSearch(searchInput.trim());
-    }, 250);
-
-    return () => clearTimeout(timer);
-  }, [searchInput]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchItems();
+      fetchItems({ background: items.length > 0 });
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [fetchItems, search, typeFilter, statusFilter, branchFilter, departmentFilter, userFilter]);
+  }, [fetchItems, items.length]);
 
   usePolling(() => {
     fetchSummary();
@@ -354,6 +380,75 @@ const AdminInventory = () => {
     setTransferModalOpen(true);
   };
 
+  const handleCsvImport = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImportingCsv(true);
+    setImportFeedback({ type: '', message: '' });
+    setFormError('');
+    setFormSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${API_BASE_URL}/admin/inventory/import`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${getAdminToken()}`,
+        },
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Failed to import CSV');
+      }
+
+      setImportFeedback({
+        type: 'success',
+        message: `Imported ${result.data.createdCount || 0} new asset(s) and updated ${result.data.updatedCount || 0} existing asset(s).`,
+      });
+      await Promise.all([fetchSummary(), fetchUsers(), fetchItems(), fetchAssetTypes()]);
+    } catch (error) {
+      setImportFeedback({
+        type: 'error',
+        message: error.message || 'Failed to import CSV',
+      });
+    } finally {
+      setImportingCsv(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleCsvExport = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/admin/inventory/export`, {
+        headers: {
+          Authorization: `Bearer ${getAdminToken()}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Unable to export inventory CSV');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'inventory-export.csv';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setImportFeedback({ type: 'success', message: 'Inventory export downloaded successfully.' });
+    } catch (error) {
+      setImportFeedback({ type: 'error', message: error.message || 'Failed to export CSV' });
+    }
+  };
+
   const selectUser = (user) => {
     setSelectedUser(user);
     setUserFilter(String(user.id));
@@ -371,6 +466,26 @@ const AdminInventory = () => {
       params.delete('userId');
       return params;
     });
+  };
+
+  const handleAssignedUserChange = (value) => {
+    const user = users.find((u) => String(u.id) === String(value));
+    setItemForm((current) => ({
+      ...current,
+      assigned_user_id: value || '',
+      assigned_department: user ? user.department || '' : '',
+      assigned_branch: user ? normalizeBranchValue(user.branch) || '' : '',
+    }));
+  };
+
+  const handleTransferUserChange = (value) => {
+    const user = users.find((u) => String(u.id) === String(value));
+    setTransferForm((current) => ({
+      ...current,
+      to_user_id: value || '',
+      to_department: user ? user.department || '' : '',
+      to_branch: user ? normalizeBranchValue(user.branch) || '' : '',
+    }));
   };
 
   const openAssetRouteModal = (item) => {
@@ -503,7 +618,16 @@ const AdminInventory = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <input ref={fileInputRef} type="file" accept=".csv,text/csv" className="hidden" onChange={handleCsvImport} />
+            <button onClick={() => fileInputRef.current?.click()} disabled={importingCsv} className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-[#28392f] bg-[#111814] px-4 py-2 font-semibold text-white transition-colors hover:border-primary hover:text-primary disabled:opacity-50">
+              <span className="material-symbols-outlined text-[20px]">upload_file</span>
+              <span>{importingCsv ? 'Importing...' : 'Import CSV'}</span>
+            </button>
+            <button onClick={handleCsvExport} className="hidden sm:inline-flex items-center gap-2 rounded-xl border border-[#28392f] bg-[#111814] px-4 py-2 font-semibold text-white transition-colors hover:border-primary hover:text-primary">
+              <span className="material-symbols-outlined text-[20px]">download</span>
+              <span>Export CSV</span>
+            </button>
             <button onClick={openCreateModal} className="hidden sm:inline-flex items-center gap-2 rounded-xl bg-primary hover:bg-[#32d473] text-[#102217] px-4 py-2 font-bold transition-colors">
               <span className="material-symbols-outlined text-[20px]">add</span>
               <span>Add Asset</span>
@@ -533,12 +657,28 @@ const AdminInventory = () => {
                   <h1 className="text-3xl lg:text-4xl font-black text-white tracking-tight mb-2">Asset Registry</h1>
                   <p className="text-[#9cbaa8]">Browse and manage assets with model, serial, location, and user details in one registry.</p>
                 </div>
-                <button onClick={openCreateModal} className="inline-flex sm:hidden items-center justify-center gap-2 rounded-xl bg-primary hover:bg-[#32d473] text-[#102217] px-4 py-2 font-bold transition-colors">
-                  <span className="material-symbols-outlined text-[20px]">add</span>
-                  <span>Add Asset</span>
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => fileInputRef.current?.click()} disabled={importingCsv} className="inline-flex sm:hidden items-center justify-center gap-2 rounded-xl border border-[#28392f] bg-[#111814] px-4 py-2 font-semibold text-white transition-colors hover:border-primary hover:text-primary disabled:opacity-50">
+                    <span className="material-symbols-outlined text-[20px]">upload_file</span>
+                    <span>{importingCsv ? 'Importing...' : 'Import CSV'}</span>
+                  </button>
+                  <button onClick={handleCsvExport} className="inline-flex sm:hidden items-center justify-center gap-2 rounded-xl border border-[#28392f] bg-[#111814] px-4 py-2 font-semibold text-white transition-colors hover:border-primary hover:text-primary">
+                    <span className="material-symbols-outlined text-[20px]">download</span>
+                    <span>Export CSV</span>
+                  </button>
+                  <button onClick={openCreateModal} className="inline-flex sm:hidden items-center justify-center gap-2 rounded-xl bg-primary hover:bg-[#32d473] text-[#102217] px-4 py-2 font-bold transition-colors">
+                    <span className="material-symbols-outlined text-[20px]">add</span>
+                    <span>Add Asset</span>
+                  </button>
+                </div>
               </div>
             </div>
+
+            {importFeedback.message && (
+              <div className={`rounded-xl border px-4 py-3 text-sm ${importFeedback.type === 'error' ? 'border-red-500/20 bg-red-500/10 text-red-400' : 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'}`}>
+                {importFeedback.message}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
               {[
@@ -650,7 +790,11 @@ const AdminInventory = () => {
                   </div>
                 </div>
 
-                <div className="overflow-x-auto">
+                <div className={`px-0 transition-all`}>
+                  <div className={`px-6 py-3 text-sm text-[#9cbaa8] border-b border-[#28392f] bg-[#111814] transition-opacity duration-200 ${isRefreshing && !loading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                    Refreshing assets...
+                  </div>
+                  <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-[#111814] text-[#9cbaa8] text-xs uppercase tracking-wider">
@@ -714,6 +858,7 @@ const AdminInventory = () => {
                   </table>
                 </div>
               </div>
+            </div>
 
               {/* Right-column modules removed: User Asset History, Asset Route, Type Split */}
             </div>
@@ -809,7 +954,7 @@ const AdminInventory = () => {
 
                 <label className="block">
                   <span className="text-sm font-medium text-[#9cbaa8]">Assigned user</span>
-                  <select value={itemForm.assigned_user_id} onChange={(event) => setItemForm((current) => ({ ...current, assigned_user_id: event.target.value }))} className="mt-1 w-full h-11 px-4 rounded-xl bg-[#1d2d25] border border-[#28392f] text-white">
+                  <select value={itemForm.assigned_user_id} onChange={(event) => handleAssignedUserChange(event.target.value)} className="mt-1 w-full h-11 px-4 rounded-xl bg-[#1d2d25] border border-[#28392f] text-white">
                     <option value="">Assign to user</option>
                     {availableUsersForItem.map((user) => <option key={user.id} value={user.id}>{user.name || user.username}</option>)}
                   </select>
@@ -912,7 +1057,7 @@ const AdminInventory = () => {
 
                 <label className="block">
                   <span className="text-sm font-medium text-[#9cbaa8]">Move to user</span>
-                  <select value={transferForm.to_user_id} onChange={(event) => setTransferForm((current) => ({ ...current, to_user_id: event.target.value }))} className="mt-1 w-full h-11 px-4 rounded-xl bg-[#1d2d25] border border-[#28392f] text-white">
+                  <select value={transferForm.to_user_id} onChange={(event) => handleTransferUserChange(event.target.value)} className="mt-1 w-full h-11 px-4 rounded-xl bg-[#1d2d25] border border-[#28392f] text-white">
                     <option value="">Move to user</option>
                     {availableUsersForTransfer.map((user) => <option key={user.id} value={user.id}>{user.name || user.username}</option>)}
                   </select>

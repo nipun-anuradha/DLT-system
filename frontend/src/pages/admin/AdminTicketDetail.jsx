@@ -14,8 +14,11 @@ const AdminTicketDetail = () => {
   const [message, setMessage] = useState('');
   const [ticket, setTicket] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [admins, setAdmins] = useState([]);
+  const [selectedAssignee, setSelectedAssignee] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [assigning, setAssigning] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [previewImages, setPreviewImages] = useState([]);
   const fileInputRef = useRef(null);
@@ -46,6 +49,7 @@ const AdminTicketDetail = () => {
       const data = await response.json();
       if (data.success) {
         setTicket(data.data);
+        setSelectedAssignee(String(data.data.assigned_admin_id || ''));
         // Sort messages by createdAt
         const sortedMessages = (data.data.messages || []).sort(
           (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
@@ -67,6 +71,35 @@ const AdminTicketDetail = () => {
       fetchTicket(true);
     }
   }, [id, fetchTicket]);
+
+  const fetchAdmins = useCallback(async () => {
+    if (!admin?.is_super) {
+      return;
+    }
+
+    try {
+      const token = getAdminToken();
+      const response = await fetch(`${API_BASE_URL}/admin/admins`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setAdmins(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching admins:', error);
+    }
+  }, [admin]);
+
+  useEffect(() => {
+    if (admin?.is_super) {
+      fetchAdmins();
+    }
+  }, [admin, fetchAdmins]);
 
   // Poll for new messages every 10 seconds (only when ticket is not closed)
   usePolling(
@@ -295,6 +328,37 @@ const AdminTicketDetail = () => {
     } catch (error) {
       console.error('Error taking ticket:', error);
       alert('Failed to take ticket');
+    }
+  };
+
+  const handleAssignAdmin = async () => {
+    if (!selectedAssignee || !ticket) {
+      return;
+    }
+
+    try {
+      setAssigning(true);
+      const token = getAdminToken();
+      const response = await fetch(`${API_BASE_URL}/admin/tickets/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ assigned_admin_id: Number(selectedAssignee) })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        await fetchTicket(false);
+      } else {
+        alert(data.message || 'Failed to assign ticket');
+      }
+    } catch (error) {
+      console.error('Error assigning ticket:', error);
+      alert('Failed to assign ticket');
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -529,6 +593,38 @@ const AdminTicketDetail = () => {
                 ticket.priority === 'high' ? 'text-red-400' : 
                 ticket.priority === 'medium' ? 'text-yellow-400' : 'text-green-400'
               }`}>{ticket.priority}</span>
+            </div>
+          )}
+
+          {admin?.is_super && !isClosed && (
+            <div className="w-full mt-4 p-4 rounded-2xl border border-[#273a2f] bg-[#162b20]">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm text-[#9cbaa8]">Assign ticket to admin</p>
+                  <select
+                    className="mt-2 w-full md:w-72 h-11 px-4 rounded-xl bg-[#1d2d25] border border-[#28392f] text-white"
+                    value={selectedAssignee}
+                    onChange={(e) => setSelectedAssignee(e.target.value)}
+                  >
+                    <option value="">Select admin</option>
+                    {admins.map((adminOption) => (
+                      <option key={adminOption.id} value={adminOption.id}>
+                        {adminOption.username}{adminOption.is_super ? ' (Super)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAssignAdmin}
+                  disabled={!selectedAssignee || assigning}
+                  className={`mt-2 md:mt-0 inline-flex items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition ${
+                    !selectedAssignee || assigning ? 'bg-slate-500/20 text-slate-500 cursor-not-allowed' : 'bg-primary text-background-dark hover:bg-primary/90'
+                  }`}
+                >
+                  {assigning ? 'Assigning...' : 'Assign Admin'}
+                </button>
+              </div>
             </div>
           )}
         </div>

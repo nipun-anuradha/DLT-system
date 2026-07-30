@@ -1,5 +1,7 @@
 const { Op } = require('sequelize');
+const { sequelize } = require('../config/db');
 const { Ticket, Message, User, Admin, Notice, InventoryItem, InventoryTransfer, AssetType } = require('../models/associations');
+const { parseCsvText, mapInventoryRowToPayload } = require('../utils/inventoryCsv');
 
 const ticketListInclude = [
   {
@@ -26,11 +28,13 @@ const ticketListInclude = [
 // @access  Private (Admin)
 const getDashboardCounts = async (req, res, next) => {
   try {
+    const baseWhere = req.admin.is_super ? {} : { assigned_admin_id: req.admin.id };
+
     const [totalTickets, openTickets, inprogressTickets, closedTickets, totalUsers] = await Promise.all([
-      Ticket.count(),
-      Ticket.count({ where: { status: 'open' } }),
-      Ticket.count({ where: { status: { [Op.in]: ['inprogress', 'taken'] } } }),
-      Ticket.count({ where: { status: 'close' } }),
+      Ticket.count({ where: baseWhere }),
+      Ticket.count({ where: { ...baseWhere, status: 'open' } }),
+      Ticket.count({ where: { ...baseWhere, status: { [Op.in]: ['inprogress', 'taken'] } } }),
+      Ticket.count({ where: { ...baseWhere, status: 'close' } }),
       User.count()
     ]);
 
@@ -64,6 +68,131 @@ const inventoryTransferInclude = [
   { model: User, as: 'toUser', attributes: ['id', 'name', 'username'] },
   { model: Admin, as: 'transferredByAdmin', attributes: ['id', 'username'] }
 ];
+
+const ensureAssetType = async (typeName, transaction) => {
+  if (!typeName) return null;
+  const normalizedName = String(typeName).trim().toLowerCase();
+  if (!normalizedName) return null;
+
+  const [assetType] = await AssetType.findOrCreate({
+    where: { name: normalizedName },
+    defaults: { name: normalizedName, sort_order: 0, is_active: true },
+    transaction,
+  });
+
+  return assetType;
+};
+
+const resolveAssignedUser = async (name, transaction) => {
+  const normalizedName = String(name || '').trim();
+  if (!normalizedName) return null;
+
+  return User.findOne({
+    where: {
+      [Op.or]: [
+        { name: normalizedName },
+        { username: normalizedName }
+      ]
+    },
+    transaction,
+  });
+};
+
+const createInventoryTransferRecord = async ({ item, previousAssignment, currentAssignment, adminId, notes, transaction }) => {
+  const assignmentChanged = Object.keys(previousAssignment).some((key) => `${previousAssignment[key] || ''}` !== `${currentAssignment[key] || ''}`);
+
+  if (!assignmentChanged) return;
+
+  if (currentAssignment.assigned_user_id || currentAssignment.assigned_department || currentAssignment.assigned_branch) {
+    await InventoryTransfer.create({
+      inventory_item_id: item.id,
+      from_user_id: previousAssignment.assigned_user_id || null,
+      to_user_id: currentAssignment.assigned_user_id || null,
+      from_department: previousAssignment.assigned_department || null,
+      to_department: currentAssignment.assigned_department || null,
+      from_branch: previousAssignment.assigned_branch || null,
+      to_branch: currentAssignment.assigned_branch || null,
+      transferred_by_admin_id: adminId || null,
+      notes: notes || 'Imported or updated from CSV',
+      transferred_at: new Date(),
+    }, { transaction });
+  }
+};
+
+const upsertInventoryItemFromPayload = async (payload, adminId, transaction) => {
+  const assignedUser = await resolveAssignedUser(payload.assigned_user_name, transaction);
+  const userId = assignedUser?.id || null;
+  const hasAssignment = Boolean(userId || payload.assigned_department || payload.assigned_branch);
+
+  const basePayload = {
+    item_type: payload.item_type || 'other',
+    name: payload.name || 'Unnamed asset',
+    model: payload.model || null,
+    serial_number: payload.serial_number || null,
+    asset_tag: payload.asset_tag || null,
+    specs: payload.specs || null,
+    status: payload.status || (hasAssignment ? 'assigned' : 'available'),
+    assigned_user_id: userId,
+    assigned_department: payload.assigned_department || null,
+    assigned_branch: payload.assigned_branch || null,
+    location: payload.location || payload.assigned_branch || null,
+    notes: payload.notes || null,
+    imei_number: payload.imei_number || null,
+    old_user_3: payload.old_user_3 || null,
+    old_user_2: payload.old_user_2 || null,
+    old_user_1: payload.old_user_1 || null,
+    vendor: payload.vendor || null,
+    invoice_no: payload.invoice_no || null,
+    purchased_date: payload.purchased_date || null,
+    purchased_amount: payload.purchased_amount || null,
+    imported_from_csv: Boolean(payload.imported_from_csv),
+    assigned_at: userId || payload.assigned_department || payload.assigned_branch ? new Date() : null,
+  };
+
+  let item = null;
+  if (basePayload.asset_tag) {
+    item = await InventoryItem.findOne({ where: { asset_tag: basePayload.asset_tag }, transaction });
+  }
+
+  if (!item && basePayload.serial_number) {
+    item = await InventoryItem.findOne({ where: { serial_number: basePayload.serial_number }, transaction });
+  }
+
+  const previousAssignment = {
+    assigned_user_id: item?.assigned_user_id || null,
+    assigned_department: item?.assigned_department || null,
+    assigned_branch: item?.assigned_branch || null,
+  };
+
+  if (item) {
+    Object.assign(item, basePayload);
+    if (!item.assigned_user_id && !item.assigned_department && !item.assigned_branch) {
+      item.status = payload.status || item.status || 'available';
+    }
+    await item.save({ transaction });
+  } else {
+    item = await InventoryItem.create(basePayload, { transaction });
+  }
+
+  await ensureAssetType(basePayload.item_type, transaction);
+
+  const currentAssignment = {
+    assigned_user_id: item.assigned_user_id || null,
+    assigned_department: item.assigned_department || null,
+    assigned_branch: item.assigned_branch || null,
+  };
+
+  await createInventoryTransferRecord({
+    item,
+    previousAssignment,
+    currentAssignment,
+    adminId,
+    notes: payload.notes || 'Imported from CSV',
+    transaction,
+  });
+
+  return item;
+};
 
 const getInventorySummary = async (req, res, next) => {
   try {
@@ -414,6 +543,116 @@ const updateInventoryItem = async (req, res, next) => {
   }
 };
 
+const importInventoryItems = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'CSV file is required' });
+    }
+
+    const csvText = req.file.buffer.toString('utf8');
+    const rows = parseCsvText(csvText);
+
+    const transaction = await sequelize.transaction();
+    let createdCount = 0;
+    let updatedCount = 0;
+    let skippedCount = 0;
+
+    try {
+      for (const row of rows) {
+        const payload = mapInventoryRowToPayload(row);
+        const hasContent = Object.values(row).some((value) => String(value || '').trim());
+
+        if (!hasContent) {
+          skippedCount += 1;
+          continue;
+        }
+
+        const existingItem = payload.asset_tag
+          ? await InventoryItem.findOne({ where: { asset_tag: payload.asset_tag }, transaction })
+          : null;
+
+        const existingBySerial = !existingItem && payload.serial_number
+          ? await InventoryItem.findOne({ where: { serial_number: payload.serial_number }, transaction })
+          : null;
+
+        const matchedItem = existingItem || existingBySerial;
+        if (matchedItem) {
+          updatedCount += 1;
+        } else {
+          createdCount += 1;
+        }
+
+        await upsertInventoryItemFromPayload(payload, req.admin.id, transaction);
+      }
+
+      await transaction.commit();
+
+      res.json({
+        success: true,
+        message: 'Inventory CSV imported successfully',
+        data: {
+          totalRows: rows.length,
+          createdCount,
+          updatedCount,
+          skippedCount,
+        },
+      });
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+const exportInventoryItemsCsv = async (req, res, next) => {
+  try {
+    const items = await InventoryItem.findAll({
+      include: inventoryItemInclude,
+      order: [['updatedAt', 'DESC']],
+    });
+
+    const headers = ['Location', 'Dept', 'User Name', 'Category', 'DLT Asset No', 'Description', 'Serial Number', 'IMEI Number', 'Remark', 'Toner Model', 'Old User 03', 'Old User 02', 'Old User 01', 'Vendor', 'Invoice No', 'Purchased Date', 'Purchased Amount'];
+
+    const escapeCsvValue = (value) => {
+      const stringValue = value === null || value === undefined ? '' : String(value);
+      if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+        return `"${stringValue.replace(/"/g, '""')}"`;
+      }
+      return stringValue;
+    };
+
+    const rows = items.map((item) => [
+      item.assigned_branch || item.location || '',
+      item.assigned_department || '',
+      item.assignedUser?.name || item.assignedUser?.username || '',
+      item.item_type || '',
+      item.asset_tag || '',
+      item.name || '',
+      item.serial_number || '',
+      item.imei_number || '',
+      item.notes || '',
+      '',
+      item.old_user_3 || '',
+      item.old_user_2 || '',
+      item.old_user_1 || '',
+      item.vendor || '',
+      item.invoice_no || '',
+      item.purchased_date || '',
+      item.purchased_amount || '',
+    ].map(escapeCsvValue).join(','));
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="inventory-export.csv"');
+    res.send(csvContent);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const transferInventoryItem = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -474,6 +713,10 @@ const getRecentTickets = async (req, res, next) => {
       }
     }
 
+    if (!req.admin.is_super) {
+      whereClause.assigned_admin_id = req.admin.id;
+    }
+
     const tickets = await Ticket.findAll({
       where: whereClause,
       include: ticketListInclude,
@@ -484,6 +727,25 @@ const getRecentTickets = async (req, res, next) => {
     res.json({
       success: true,
       data: tickets
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get admin list for assignment
+// @route   GET /api/admin/admins
+// @access  Private (Admin)
+const getAllAdmins = async (req, res, next) => {
+  try {
+    const admins = await Admin.findAll({
+      attributes: ['id', 'username', 'is_super'],
+      order: [['username', 'ASC']]
+    });
+
+    res.json({
+      success: true,
+      data: admins
     });
   } catch (error) {
     next(error);
@@ -530,12 +792,21 @@ const getAllTickets = async (req, res, next) => {
       whereClause.category = category;
     }
 
-    // Search by id, subject
+    // Search by id, subject, and ticket user fields
     if (search) {
+      const searchTerm = `%${search.replace('#', '')}%`;
       whereClause[Op.or] = [
-        { id: { [Op.like]: `%${search.replace('#', '')}%` } },
-        { subject: { [Op.like]: `%${search}%` } }
+        { id: { [Op.like]: searchTerm } },
+        { subject: { [Op.like]: searchTerm } },
+        { '$user.name$': { [Op.like]: searchTerm } },
+        { '$user.username$': { [Op.like]: searchTerm } },
+        { '$user.branch$': { [Op.like]: searchTerm } },
+        { '$user.department$': { [Op.like]: searchTerm } }
       ];
+    }
+
+    if (!req.admin.is_super) {
+      whereClause.assigned_admin_id = req.admin.id;
     }
 
     const { count, rows: tickets } = await Ticket.findAndCountAll({
@@ -602,6 +873,13 @@ const getTicketById = async (req, res, next) => {
       });
     }
 
+    if (!req.admin.is_super && ticket.assigned_admin_id !== req.admin.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Ticket not assigned to this admin.'
+      });
+    }
+
     res.json({
       success: true,
       data: ticket
@@ -617,7 +895,7 @@ const getTicketById = async (req, res, next) => {
 const updateTicket = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { status, priority, category, resolvedByAdminId } = req.body;
+    const { status, priority, category, resolvedByAdminId, assigned_admin_id } = req.body;
 
     const ticket = await Ticket.findByPk(id);
 
@@ -628,12 +906,46 @@ const updateTicket = async (req, res, next) => {
       });
     }
 
+    if (!req.admin.is_super && ticket.assigned_admin_id !== req.admin.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Ticket not assigned to this admin.'
+      });
+    }
+
     // Update fields if provided
     if (status) ticket.status = status;
     if (priority) ticket.priority = priority;
     if (category) ticket.category = category;
 
+    if (assigned_admin_id !== undefined && assigned_admin_id !== null) {
+      if (!req.admin.is_super) {
+        return res.status(403).json({
+          success: false,
+          message: 'Only super admins can assign tickets to other admins.'
+        });
+      }
+
+      const assignee = await Admin.findByPk(assigned_admin_id);
+      if (!assignee) {
+        return res.status(400).json({
+          success: false,
+          message: 'Assigned admin not found'
+        });
+      }
+
+      ticket.assigned_admin_id = assigned_admin_id;
+      ticket.assigned_at = ticket.assigned_at || new Date();
+      ticket.status = 'inprogress';
+    }
+
     if (status === 'taken' || status === 'inprogress') {
+      if (!req.admin.is_super && ticket.assigned_admin_id !== req.admin.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Only assigned admin can take this ticket.'
+        });
+      }
       ticket.assigned_admin_id = req.admin.id;
       if (!ticket.assigned_at) {
         ticket.assigned_at = new Date();
@@ -688,10 +1000,17 @@ const takeTicket = async (req, res, next) => {
       });
     }
 
-    if (ticket.assigned_admin_id && ticket.assigned_admin_id !== req.admin.id) {
+    if (ticket.assigned_admin_id && ticket.assigned_admin_id !== req.admin.id && !req.admin.is_super) {
       return res.status(409).json({
         success: false,
         message: 'This ticket has already been taken by another admin'
+      });
+    }
+
+    if (!ticket.assigned_admin_id && !req.admin.is_super) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only super admins can take unassigned tickets'
       });
     }
 
@@ -738,6 +1057,13 @@ const addAdminMessage = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: 'Ticket not found'
+      });
+    }
+
+    if (!req.admin.is_super && ticket.assigned_admin_id !== req.admin.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Ticket not assigned to this admin.'
       });
     }
 
@@ -1300,6 +1626,8 @@ module.exports = {
   getInventoryItemHistory,
   createInventoryItem,
   updateInventoryItem,
+  importInventoryItems,
+  exportInventoryItemsCsv,
   transferInventoryItem,
   // Tickets
   getAllTickets,
@@ -1307,6 +1635,7 @@ module.exports = {
   updateTicket,
   takeTicket,
   addAdminMessage,
+  getAllAdmins,
   // Users
   getAllUsers,
   getUserById,

@@ -52,6 +52,23 @@ const upload = multer({
   }
 });
 
+const csvStorage = multer.memoryStorage();
+const csvUpload = multer({
+  storage: csvStorage,
+  fileFilter: (req, file, cb) => {
+    const allowedExtensions = ['.csv'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedExtensions.includes(ext) || file.mimetype === 'text/csv' || file.mimetype === 'application/vnd.ms-excel') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV files are allowed'), false);
+    }
+  },
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  }
+});
+
 // Error handler for multer
 const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
@@ -85,5 +102,6 @@ const handleUploadError = (err, req, res, next) => {
 
 module.exports = {
   upload,
+  csvUpload,
   handleUploadError
 };

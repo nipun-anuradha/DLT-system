@@ -30,6 +30,43 @@ const InventoryItem = sequelize.define('InventoryItem', {
     type: DataTypes.STRING(100),
     allowNull: true,
   },
+  imei_number: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+  },
+  old_user_3: {
+    type: DataTypes.STRING(150),
+    allowNull: true,
+  },
+  old_user_2: {
+    type: DataTypes.STRING(150),
+    allowNull: true,
+  },
+  old_user_1: {
+    type: DataTypes.STRING(150),
+    allowNull: true,
+  },
+  vendor: {
+    type: DataTypes.STRING(150),
+    allowNull: true,
+  },
+  invoice_no: {
+    type: DataTypes.STRING(100),
+    allowNull: true,
+  },
+  purchased_date: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+  },
+  purchased_amount: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+  },
+  imported_from_csv: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
   specs: {
     type: DataTypes.TEXT,
     allowNull: true,
