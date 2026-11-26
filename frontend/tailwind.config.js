@@ -8,13 +8,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        "primary": "#38e07b",
-        "background-light": "#f6f8f7",
-        "background-dark": "#122017",
-        "card-dark": "#1a2c23",
-        "surface-dark": "#1c2e25",
-        "input-border": "#3d5245",
-        "input-bg": "#1c2620",
+        "primary": "#149b5b",
+        "background-light": "#f5f8f6",
+        "background-dark": "#ffffff",
+        "card-dark": "#ffffff",
+        "surface-dark": "#ffffff",
+        "input-border": "#d6e0da",
+        "input-bg": "#ffffff",
       },
       fontFamily: {
         "display": ["Spline Sans", "sans-serif"]

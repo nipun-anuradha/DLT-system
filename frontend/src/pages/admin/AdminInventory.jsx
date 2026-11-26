@@ -65,6 +65,20 @@ const formatDateTime = (value) => {
   });
 };
 
+const formatSerialNumber = (value) => {
+  const normalized = String(value || '').trim();
+  const match = normalized.match(/^([+-]?)(\d+)(?:\.(\d+))?[eE]([+-]?\d+)$/);
+  if (!match) return normalized || '-';
+
+  const [, sign, integerPart, fractionalPart = '', exponentText] = match;
+  const digits = `${integerPart}${fractionalPart}`;
+  const decimalIndex = integerPart.length + Number(exponentText);
+
+  if (decimalIndex <= 0) return `${sign}0.${'0'.repeat(-decimalIndex)}${digits}`;
+  if (decimalIndex >= digits.length) return `${sign}${digits}${'0'.repeat(decimalIndex - digits.length)}`;
+  return `${sign}${digits.slice(0, decimalIndex)}.${digits.slice(decimalIndex)}`;
+};
+
 const badgeClass = (status) => {
   switch (status) {
     case 'available': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
@@ -795,7 +809,7 @@ const AdminInventory = () => {
                     Refreshing assets...
                   </div>
                   <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="admin-table w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-[#111814] text-[#9cbaa8] text-xs uppercase tracking-wider">
                         <th className="px-5 py-4 font-medium border-b border-[#28392f]">Asset</th>
@@ -823,7 +837,7 @@ const AdminInventory = () => {
                             </div>
                           </td>
                           <td className="px-5 py-4 text-[#9cbaa8]">{item.model || '-'}</td>
-                          <td className="px-5 py-4 text-[#9cbaa8] font-mono text-xs">{item.serial_number || '-'}</td>
+                          <td className="px-5 py-4 text-[#9cbaa8] font-mono text-xs">{formatSerialNumber(item.serial_number)}</td>
                           <td className="px-5 py-4 text-[#9cbaa8] font-mono text-xs">{item.asset_tag || '-'}</td>
                           <td className="px-5 py-4 text-[#9cbaa8]">{item.assigned_department || item.assignedUser?.department || '-'}</td>
                           <td className="px-5 py-4 text-[#9cbaa8]">{item.location || item.assigned_branch || item.assignedUser?.branch || '-'}</td>

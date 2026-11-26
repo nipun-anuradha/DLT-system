@@ -6,6 +6,26 @@ const normalizeValue = (value) => {
   return String(value).trim();
 };
 
+const expandScientificNotation = (value) => {
+  const normalized = normalizeValue(value);
+  const match = normalized.match(/^([+-]?)(\d+)(?:\.(\d+))?[eE]([+-]?\d+)$/);
+  if (!match) return normalized;
+
+  const [, sign, integerPart, fractionalPart = '', exponentText] = match;
+  const digits = `${integerPart}${fractionalPart}`;
+  const decimalIndex = integerPart.length + Number(exponentText);
+
+  if (decimalIndex <= 0) {
+    return `${sign}0.${'0'.repeat(-decimalIndex)}${digits}`;
+  }
+
+  if (decimalIndex >= digits.length) {
+    return `${sign}${digits}${'0'.repeat(decimalIndex - digits.length)}`;
+  }
+
+  return `${sign}${digits.slice(0, decimalIndex)}.${digits.slice(decimalIndex)}`;
+};
+
 const parseCsvText = (text) => {
   if (!text || !text.trim()) return [];
   return parse(text, {
@@ -51,7 +71,7 @@ const mapInventoryRowToPayload = (row) => {
   const category = normalizeValue(row.Category || row.category || row.Category || row.type);
   const assetTag = normalizeValue(row['DLT Asset No'] || row['DLT Asset No'] || row.asset_tag || row.assetTag);
   const description = normalizeValue(row.Description || row.description || row.name || row.Name);
-  const serialNumber = normalizeValue(row['Serial Number'] || row.serial_number || row.serialNumber);
+  const serialNumber = expandScientificNotation(row['Serial Number'] || row.serial_number || row.serialNumber);
   const imeiNumber = normalizeValue(row['IMEI Number'] || row.imei || row.imei_number || row.imeiNumber);
   const remark = normalizeValue(row.Remark || row.remark || row.notes);
   const tonerModel = normalizeValue(row['Toner Model'] || row.toner_model || row.tonerModel);
@@ -105,5 +125,6 @@ module.exports = {
   parseCsvText,
   mapInventoryRowToPayload,
   normalizeValue,
+  expandScientificNotation,
   inferItemType,
 };

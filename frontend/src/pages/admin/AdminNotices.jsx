@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import AdminSidebar from '../../components/layout/AdminSidebar';
 import { usePolling } from '../../hooks';
 import { apiRequest } from '../../utils/api';
+import { useAuth } from '../../context';
 
 const AdminNotices = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -10,6 +11,7 @@ const AdminNotices = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+  const { admin } = useAuth();
 
   // Notices data state
   const [notices, setNotices] = useState([]);
@@ -181,12 +183,18 @@ const AdminNotices = () => {
           </div>
 
           <div className="flex flex-1 justify-end gap-4 items-center">
-            {/* Actions */}
-            <div className="flex gap-2">
-              <button className="relative flex items-center justify-center rounded-xl size-10 bg-[#273a2f] text-white hover:bg-primary hover:text-background-dark transition-all">
-                <span className="material-symbols-outlined text-xl">notifications</span>
-                <span className="absolute top-2 right-2 size-2 bg-primary rounded-full border border-surface-dark"></span>
-              </button>
+            <button className="relative flex items-center justify-center rounded-xl bg-[#28392f] hover:bg-[#344a3d] text-white p-2 transition-colors">
+              <span className="material-symbols-outlined">notifications</span>
+              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-primary ring-2 ring-[#28392f]"></span>
+            </button>
+            <div className="flex items-center gap-3 pl-4 border-l border-[#28392f]">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-medium text-white">{admin?.username || 'Admin'}</p>
+                <p className="text-xs text-[#9cbaa8]">Administrator</p>
+              </div>
+              <div className="relative size-10 rounded-full bg-gradient-to-br from-primary to-green-600 flex items-center justify-center border-2 border-[#28392f] shadow-lg">
+                <span className="material-symbols-outlined text-white text-xl">person</span>
+              </div>
             </div>
           </div>
         </header>
@@ -212,10 +220,10 @@ const AdminNotices = () => {
             </div>
 
             {/* Create Notice Section */}
-            <div className="bg-surface-dark rounded-xl border border-[#273a2f] shadow-lg overflow-hidden">
-              <div className="px-6 py-4 border-b border-[#273a2f] bg-[#273a2f]/20 flex items-center gap-2">
+            <div className="admin-table-shell rounded-xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-[#d9e5de] bg-[#f5faf7] flex items-center gap-2">
                 <span className="material-symbols-outlined text-primary">edit_note</span>
-                <h3 className="text-white text-lg font-bold">Compose New Notice</h3>
+                <h3 className="text-[#15241c] text-lg font-bold">Compose New Notice</h3>
               </div>
               <div className="p-6">
                 {/* Error Message */}
@@ -237,11 +245,11 @@ const AdminNotices = () => {
                 <form className="flex flex-col gap-6">
                   {/* Subject Input */}
                   <div className="flex flex-col gap-2">
-                    <label className="text-white text-sm font-medium" htmlFor="subject">
+                    <label className="text-[#15241c] text-sm font-medium" htmlFor="subject">
                       Subject Line <span className="text-red-400">*</span>
                     </label>
                     <input
-                      className="w-full rounded-lg bg-[#273a2f] border-transparent focus:border-primary focus:bg-[#273a2f]/80 focus:ring-0 text-white placeholder-[#9cbaa8] px-4 py-3"
+                      className="w-full rounded-lg bg-white border border-[#d6e0da] focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 text-[#17221c] placeholder-[#80958a] px-4 py-3"
                       id="subject"
                       placeholder="e.g., Scheduled Maintenance: Saturday 10 PM EST"
                       type="text"
@@ -252,12 +260,12 @@ const AdminNotices = () => {
 
                   {/* Description Textarea */}
                   <div className="flex flex-col gap-2">
-                    <label className="text-white text-sm font-medium" htmlFor="description">
+                    <label className="text-[#15241c] text-sm font-medium" htmlFor="description">
                       Content / Description <span className="text-red-400">*</span>
                     </label>
                     <div className="relative">
                       <textarea
-                        className="w-full rounded-lg bg-[#273a2f] border-transparent focus:border-primary focus:bg-[#273a2f]/80 focus:ring-0 text-white placeholder-[#9cbaa8] px-4 py-3 resize-none"
+                        className="w-full rounded-lg bg-white border border-[#d6e0da] focus:border-primary focus:bg-white focus:ring-2 focus:ring-primary/20 text-[#17221c] placeholder-[#80958a] px-4 py-3 resize-none"
                         id="description"
                         placeholder="Enter the detailed message for the users here..."
                         rows="5"
@@ -270,7 +278,7 @@ const AdminNotices = () => {
                   {/* Action Buttons */}
                   <div className="flex items-center justify-end gap-4 pt-2">
                     <button
-                      className="group flex items-center gap-2 px-6 py-2.5 rounded-lg bg-primary text-background-dark font-bold hover:bg-[#05d85a] hover:shadow-[0_0_15px_rgba(6,249,103,0.4)] transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="group flex items-center gap-2 px-6 py-2.5 rounded-lg bg-primary text-background-dark font-bold hover:bg-[#128a52] hover:shadow-[0_4px_12px_rgba(20,155,91,0.18)] transition-all transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                       type="button"
                       onClick={handlePublish}
                       disabled={isSubmitting}
@@ -306,9 +314,9 @@ const AdminNotices = () => {
                 </h3>
               </div>
 
-              <div className="bg-surface-dark rounded-xl border border-[#273a2f] shadow-lg overflow-hidden">
+              <div className="admin-table-shell rounded-xl overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
+                  <table className="admin-table w-full text-left border-collapse">
                     <thead>
                       <tr className="border-b border-[#273a2f] bg-[#273a2f]/30 text-xs uppercase tracking-wider text-[#9cbaa8] font-medium">
                         <th className="px-6 py-4">Subject</th>
@@ -379,7 +387,7 @@ const AdminNotices = () => {
 
                 {/* Pagination */}
                 {!loading && notices.length > 0 && (
-                  <div className="flex items-center justify-between px-6 py-4 border-t border-[#273a2f] bg-[#273a2f]/10">
+                  <div className="admin-table-footer flex items-center justify-between px-6 py-4 border-t">
                     <p className="text-xs text-[#9cbaa8]">
                       Showing{' '}
                       <span className="text-white font-medium">

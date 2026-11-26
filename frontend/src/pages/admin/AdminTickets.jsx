@@ -284,59 +284,59 @@ const AdminTickets = () => {
             </div>
 
             {/* Ticket Table */}
-            <div className="bg-surface-dark rounded-xl border border-[#273a2f] shadow-lg overflow-hidden flex flex-col">
-              <div className={`px-6 py-3 text-sm text-[#9cbaa8] border-b border-[#273a2f] bg-[#111814] transition-opacity duration-200 ${isRefreshing && !loading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+            <div className="admin-table-shell rounded-2xl overflow-hidden flex flex-col">
+              <div className={`px-6 py-3 text-sm text-[#547064] border-b border-[#e4ede8] bg-[#f5faf7] transition-opacity duration-200 ${isRefreshing && !loading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 Refreshing tickets...
               </div>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-[#273a2f]">
-                  <thead className="bg-[#1e3b2b]/50">
+                <table className="admin-table min-w-full divide-y divide-[#e4ede8]">
+                  <thead className="bg-[#edf5f0]">
                     <tr>
                       <th
-                        className="px-6 py-4 text-left text-xs font-semibold text-[#9cbaa8] uppercase tracking-wider"
+                        className="px-6 py-4 text-left text-xs font-bold text-[#4f665b] uppercase tracking-wider"
                         scope="col"
                       >
                         ID
                       </th>
                       <th
-                        className="px-6 py-4 text-left text-xs font-semibold text-[#9cbaa8] uppercase tracking-wider w-1/3"
+                        className="px-6 py-4 text-left text-xs font-bold text-[#4f665b] uppercase tracking-wider w-1/3"
                         scope="col"
                       >
                         Subject
                       </th>
                       <th
-                        className="px-6 py-4 text-left text-xs font-semibold text-[#9cbaa8] uppercase tracking-wider"
+                        className="px-6 py-4 text-left text-xs font-bold text-[#4f665b] uppercase tracking-wider"
                         scope="col"
                       >
                         Created By
                       </th>
                       <th
-                        className="px-6 py-4 text-left text-xs font-semibold text-[#9cbaa8] uppercase tracking-wider"
+                        className="px-6 py-4 text-left text-xs font-bold text-[#4f665b] uppercase tracking-wider"
                         scope="col"
                       >
                         Branch
                       </th>
                       <th
-                        className="px-6 py-4 text-left text-xs font-semibold text-[#9cbaa8] uppercase tracking-wider"
+                        className="px-6 py-4 text-left text-xs font-bold text-[#4f665b] uppercase tracking-wider"
                         scope="col"
                       >
                         Date
                       </th>
                       <th
-                        className="px-6 py-4 text-left text-xs font-semibold text-[#9cbaa8] uppercase tracking-wider"
+                        className="px-6 py-4 text-left text-xs font-bold text-[#4f665b] uppercase tracking-wider"
                         scope="col"
                       >
                         Status
                       </th>
                       <th
-                        className="px-6 py-4 text-right text-xs font-semibold text-[#9cbaa8] uppercase tracking-wider"
+                        className="px-6 py-4 text-right text-xs font-bold text-[#4f665b] uppercase tracking-wider"
                         scope="col"
                       >
                         Actions
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#273a2f]">
+                  <tbody className="divide-y divide-[#e4ede8]">
                     {loading ? (
                       <tr>
                         <td colSpan="7" className="px-6 py-12 text-center">
@@ -358,13 +358,13 @@ const AdminTickets = () => {
                         return (
                           <tr
                             key={ticket.id}
-                            className="group hover:bg-[#1e3b2b]/30 transition-colors cursor-pointer"
+                            className="group hover:bg-[#f5faf7] transition-colors cursor-pointer"
                             onClick={() => handleRowClick(ticket.id)}
                           >
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary">#{ticket.id}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-[#07834a]">#{ticket.id}</td>
                             <td className="px-6 py-4">
                               <div className="flex items-center">
-                                <div className="text-sm font-medium text-white truncate max-w-[250px]">
+                                <div className="text-sm font-semibold text-[#15241c] truncate max-w-[250px]">
                                   {ticket.subject}
                                 </div>
                               </div>
@@ -372,11 +372,11 @@ const AdminTickets = () => {
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center">
                                 <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-green-600 flex-shrink-0 flex items-center justify-center">
-                                  <span className="material-symbols-outlined text-white text-sm">person</span>
+                                  <span className="material-symbols-outlined text-[#07834a] text-sm">person</span>
                                 </div>
                                 <div className="ml-3">
-                                  <div className="text-sm font-medium text-white">{ticket.user?.name || 'Unknown'}</div>
-                                  <div className="text-xs text-[#9cbaa8]">{ticket.user?.department || 'N/A'}</div>
+                                  <div className="text-sm font-semibold text-[#1c2b23]">{ticket.user?.name || 'Unknown'}</div>
+                                  <div className="text-xs text-[#71877b]">{ticket.user?.department || 'N/A'}</div>
                                     {ticket.assignedAdmin?.username && (
                                       <div className="text-[11px] text-amber-400 mt-0.5">
                                         Taken by {ticket.assignedAdmin.username}
@@ -385,8 +385,8 @@ const AdminTickets = () => {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[#9cbaa8]">{ticket.user?.branch || 'N/A'}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[#9cbaa8]">{formatDate(ticket.date)}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[#587066]">{ticket.user?.branch || 'N/A'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-[#587066]">{formatDate(ticket.date)}</td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span
                                 className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusClass(statusInfo.color)}`}
@@ -398,7 +398,7 @@ const AdminTickets = () => {
                               <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                 {ticket.status === 'open' && (
                                   <button
-                                    className="px-2.5 py-1 text-xs font-medium rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+                                    className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors"
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleTakeTicket(ticket.id);
@@ -409,7 +409,7 @@ const AdminTickets = () => {
                                   </button>
                                 )}
                                 <button
-                                  className="p-1 text-[#9cbaa8] hover:text-white transition-colors"
+                                  className="p-1 text-[#71877b] hover:text-[#07834a] hover:bg-[#e8f5ed] rounded-md transition-colors"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleRowClick(ticket.id);
@@ -419,7 +419,7 @@ const AdminTickets = () => {
                                   <span className="material-symbols-outlined text-[20px]">visibility</span>
                                 </button>
                                 <button
-                                  className="p-1 text-[#9cbaa8] hover:text-primary transition-colors"
+                                  className="p-1 text-[#71877b] hover:text-[#07834a] hover:bg-[#e8f5ed] rounded-md transition-colors"
                                   onClick={(e) => e.stopPropagation()}
                                   title="Edit Status"
                                 >
@@ -427,7 +427,7 @@ const AdminTickets = () => {
                                 </button>
                                 {ticket.status !== 'close' && (
                                   <button
-                                    className="p-1 text-[#9cbaa8] hover:text-red-400 transition-colors"
+                                    className="p-1 text-[#71877b] hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
                                     onClick={(e) => e.stopPropagation()}
                                     title="Close Ticket"
                                   >
@@ -445,7 +445,7 @@ const AdminTickets = () => {
               </div>
 
               {/* Pagination */}
-              <div className="bg-surface-dark border-t border-[#273a2f] px-4 py-3 flex items-center justify-between sm:px-6">
+              <div className="admin-table-footer border-t px-4 py-3 flex items-center justify-between sm:px-6">
                 <div className="flex-1 flex justify-between sm:hidden">
                   <button
                     className="relative inline-flex items-center px-4 py-2 border border-[#273a2f] text-sm font-medium rounded-md text-[#9cbaa8] bg-background-dark hover:bg-[#28392f] disabled:opacity-50 disabled:cursor-not-allowed"

@@ -319,7 +319,7 @@ const Tickets = () => {
                   onClick={() => setActiveFilter('my')}
                   className={`whitespace-nowrap flex items-center gap-2 px-4 py-2.5 rounded-full text-sm ${
                     activeFilter === 'my'
-                      ? 'bg-slate-900 dark:bg-white text-white dark:text-background-dark font-bold shadow-md'
+                      ? 'bg-primary text-white font-bold shadow-md shadow-primary/20'
                       : 'bg-white dark:bg-[#1c2e24] border border-gray-200 dark:border-[#29382f] text-slate-600 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-[#29382f]'
                   } transition-colors`}
                 >

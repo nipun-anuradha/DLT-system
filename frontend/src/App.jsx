@@ -31,7 +31,7 @@ const AdminProtectedLayout = () => (
 
 function App() {
   return (
-    <div className="dark">
+    <div>
       <AuthProvider>
         <BrowserRouter>
           <Routes>

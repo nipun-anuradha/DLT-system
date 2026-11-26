@@ -496,12 +496,12 @@ const AdminUsers = () => {
             </div>
 
             {/* Data Table */}
-            <div className="rounded-2xl border border-[#28392f] bg-surface-dark overflow-hidden shadow-lg">
+            <div className="admin-table-shell rounded-2xl overflow-hidden">
               <div className={`px-6 py-3 text-xs text-[#9cbaa8] border-b border-[#28392f] bg-[#111814] transition-opacity duration-200 ${isFetching && !loading ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 Refreshing users...
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="admin-table w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-[#15261d] text-[#9cbaa8] text-xs uppercase tracking-wider font-semibold">
                       <th className="p-4 border-b border-[#28392f] w-12">
@@ -635,7 +635,7 @@ const AdminUsers = () => {
 
               {/* Pagination Footer */}
               {!loading && users.length > 0 && (
-                <div className="flex items-center justify-between border-t border-[#28392f] bg-[#15261d] px-4 py-3 sm:px-6">
+                <div className="admin-table-footer flex items-center justify-between border-t px-4 py-3 sm:px-6">
                   <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
                     <div>
                       <p className="text-sm text-[#9cbaa8]">

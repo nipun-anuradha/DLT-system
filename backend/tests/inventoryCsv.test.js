@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseCsvText, mapInventoryRowToPayload } = require('../utils/inventoryCsv');
+const { parseCsvText, mapInventoryRowToPayload, expandScientificNotation } = require('../utils/inventoryCsv');
 
 test('parses quoted CSV rows and maps the template columns into inventory fields', () => {
   const csv = [
@@ -29,4 +29,9 @@ test('parses quoted CSV rows and maps the template columns into inventory fields
   assert.equal(payload.invoice_no, 'T00908');
   assert.equal(payload.purchased_date, '8-Sep-2025');
   assert.equal(payload.purchased_amount, '149000.00');
+});
+
+test('expands scientific notation serials without converting them to JavaScript numbers', () => {
+  assert.equal(expandScientificNotation('3.20E+11'), '320000000000');
+  assert.equal(expandScientificNotation('ABC123'), 'ABC123');
 });

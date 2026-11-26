@@ -117,7 +117,7 @@ const AdminDashboard = () => {
     {
       label: 'Total Tickets',
       value: formatNumber(counts.totalTickets),
-      icon: 'layers',
+      icon: 'confirmation_number',
       color: 'primary',
     },
     {
@@ -235,21 +235,21 @@ const AdminDashboard = () => {
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div
-                      className={`bg-[#28392f] p-2 rounded-lg ${
+                        className={`bg-[#e8f5ed] p-2 rounded-lg ${
                         stat.color === 'orange' 
-                          ? 'group-hover:bg-orange-500/20' 
+                            ? 'bg-orange-50 group-hover:bg-orange-100' 
                           : stat.color === 'blue' 
-                          ? 'group-hover:bg-blue-500/20' 
-                          : 'group-hover:bg-primary/20'
+                            ? 'bg-blue-50 group-hover:bg-blue-100' 
+                            : 'group-hover:bg-primary/10'
                       } transition-colors`}
                     >
                       <span
-                        className={`material-symbols-outlined text-white ${
+                        className={`material-symbols-outlined text-[#07834a] ${
                           stat.color === 'orange' 
-                            ? 'group-hover:text-orange-500' 
+                          ? 'text-orange-500' 
                             : stat.color === 'blue' 
-                            ? 'group-hover:text-blue-500' 
-                            : 'group-hover:text-primary'
+                          ? 'text-blue-500' 
+                          : 'text-[#07834a]'
                         } transition-colors`}
                       >
                         {stat.icon}
@@ -284,16 +284,16 @@ const AdminDashboard = () => {
             </div>
 
             {/* Recent Tickets Table */}
-            <div className="bg-surface-dark border border-[#28392f] rounded-2xl overflow-hidden flex flex-col">
-              <div className="p-6 border-b border-[#28392f] flex flex-wrap justify-between items-center gap-4">
-                <h3 className="text-lg font-bold text-white">Recent Tickets</h3>
+            <div className="admin-table-shell rounded-2xl overflow-hidden flex flex-col">
+              <div className="p-6 border-b border-[#d9e5de] flex flex-wrap justify-between items-center gap-4">
+                <h3 className="text-lg font-bold text-[#15241c]">Recent Tickets</h3>
                 <div className="flex gap-2">
                   <button 
                     onClick={() => handleFilterChange('all')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                       activeFilter === 'all' 
-                        ? 'bg-[#28392f] text-white' 
-                        : 'text-[#9cbaa8] hover:text-white hover:bg-[#28392f]'
+                        ? 'bg-[#e8f5ed] text-[#07834a]' 
+                        : 'text-[#587066] hover:text-[#07834a] hover:bg-[#f5faf7]'
                     }`}
                   >
                     All
@@ -302,8 +302,8 @@ const AdminDashboard = () => {
                     onClick={() => handleFilterChange('open')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                       activeFilter === 'open' 
-                        ? 'bg-[#28392f] text-white' 
-                        : 'text-[#9cbaa8] hover:text-white hover:bg-[#28392f]'
+                        ? 'bg-[#e8f5ed] text-[#07834a]' 
+                        : 'text-[#587066] hover:text-[#07834a] hover:bg-[#f5faf7]'
                     }`}
                   >
                     Open
@@ -312,8 +312,8 @@ const AdminDashboard = () => {
                     onClick={() => handleFilterChange('inprogress')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                       activeFilter === 'inprogress' 
-                        ? 'bg-[#28392f] text-white' 
-                        : 'text-[#9cbaa8] hover:text-white hover:bg-[#28392f]'
+                        ? 'bg-[#e8f5ed] text-[#07834a]' 
+                        : 'text-[#587066] hover:text-[#07834a] hover:bg-[#f5faf7]'
                     }`}
                   >
                     In Progress
@@ -322,8 +322,8 @@ const AdminDashboard = () => {
                     onClick={() => handleFilterChange('close')}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                       activeFilter === 'close' 
-                        ? 'bg-[#28392f] text-white' 
-                        : 'text-[#9cbaa8] hover:text-white hover:bg-[#28392f]'
+                        ? 'bg-[#e8f5ed] text-[#07834a]' 
+                        : 'text-[#587066] hover:text-[#07834a] hover:bg-[#f5faf7]'
                     }`}
                   >
                     Closed
@@ -337,19 +337,19 @@ const AdminDashboard = () => {
                     <span className="material-symbols-outlined text-3xl text-primary animate-spin">progress_activity</span>
                   </div>
                 )}
-                <table className="w-full text-left border-collapse">
+                <table className="admin-table w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-[#111814] text-[#9cbaa8] text-xs uppercase tracking-wider">
-                      <th className="px-6 py-4 font-medium border-b border-[#28392f]">Ticket ID</th>
-                      <th className="px-6 py-4 font-medium border-b border-[#28392f]">Subject</th>
-                      <th className="px-6 py-4 font-medium border-b border-[#28392f]">Requester</th>
-                      <th className="px-6 py-4 font-medium border-b border-[#28392f]">Status</th>
-                      <th className="px-6 py-4 font-medium border-b border-[#28392f]">Priority</th>
-                      <th className="px-6 py-4 font-medium border-b border-[#28392f]">Date</th>
-                      <th className="px-6 py-4 font-medium border-b border-[#28392f]"></th>
+                    <tr className="text-xs uppercase tracking-wider">
+                      <th className="px-6 py-4 font-medium">Ticket ID</th>
+                      <th className="px-6 py-4 font-medium">Subject</th>
+                      <th className="px-6 py-4 font-medium">Requester</th>
+                      <th className="px-6 py-4 font-medium">Status</th>
+                      <th className="px-6 py-4 font-medium">Priority</th>
+                      <th className="px-6 py-4 font-medium">Date</th>
+                      <th className="px-6 py-4 font-medium"></th>
                     </tr>
                   </thead>
-                  <tbody className="text-sm divide-y divide-[#28392f]">
+                  <tbody className="text-sm">
                     {recentTickets.length === 0 ? (
                       <tr>
                         <td colSpan="7" className="px-6 py-8 text-center text-[#9cbaa8]">
@@ -358,7 +358,7 @@ const AdminDashboard = () => {
                       </tr>
                     ) : (
                       recentTickets.map((ticket) => (
-                        <tr key={ticket.id} className="group hover:bg-[#1f382a] transition-colors cursor-pointer" onClick={() => navigate(`/admin/tickets/${ticket.id}`)}>
+                        <tr key={ticket.id} className="group transition-colors cursor-pointer" onClick={() => navigate(`/admin/tickets/${ticket.id}`)}>
                           <td className="px-6 py-4 text-white font-mono">#{ticket.id}</td>
                           <td className="px-6 py-4 text-white font-medium">{ticket.subject}</td>
                           <td className="px-6 py-4">
@@ -404,7 +404,7 @@ const AdminDashboard = () => {
                           </td>
                           <td className="px-6 py-4 text-[#9cbaa8]">{formatDate(ticket.date)}</td>
                           <td className="px-6 py-4 text-right">
-                            <button className="text-[#9cbaa8] hover:text-white" onClick={(e) => e.stopPropagation()}>
+                            <button className="text-[#587066] hover:text-[#07834a]" onClick={(e) => e.stopPropagation()}>
                               <span className="material-symbols-outlined text-[20px]">more_vert</span>
                             </button>
                           </td>
@@ -415,7 +415,7 @@ const AdminDashboard = () => {
                 </table>
               </div>
 
-              <div className="p-4 border-t border-[#28392f] bg-[#111814] flex justify-center">
+              <div className="admin-table-footer p-4 border-t flex justify-center">
                 <button 
                   className="text-[#9cbaa8] text-sm hover:text-white flex items-center gap-1 transition-colors"
                   onClick={() => navigate('/admin/tickets')}

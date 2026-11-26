@@ -156,7 +156,7 @@ const AdminLogin = () => {
 
               {/* Login Button */}
               <button
-                className="mt-2 w-full h-10 bg-primary text-background-dark font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-[#00ff66] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#102217] focus:ring-primary active:scale-[0.98] transition-all shadow-lg shadow-primary/30 hover:shadow-primary/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary text-sm"
+                className="mt-2 w-full h-10 bg-primary text-background-dark font-bold rounded-lg flex items-center justify-center gap-2 hover:bg-[#32d473] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#102217] focus:ring-primary active:scale-[0.98] transition-all shadow-lg shadow-primary/30 hover:shadow-primary/50 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary text-sm"
                 type="submit"
                 disabled={loading || !formData.username || !formData.password}
               >

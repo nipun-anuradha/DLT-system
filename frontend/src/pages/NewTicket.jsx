@@ -400,7 +400,7 @@ const NewTicket = () => {
                     {selectedCategoryMeta && selectedItemMeta && selectedIssueMeta && (
                       <div className="rounded-[1.75rem] border border-primary/30 bg-primary/10 p-5">
                         <p className="text-sm text-[#9eb7a8]">Selected request</p>
-                        <p className="mt-1 text-lg font-semibold text-white">
+                        <p className="mt-1 text-lg font-semibold text-[#111714]">
                           {selectedCategoryMeta.name} / {selectedItemMeta.name} / {selectedIssueMeta.name}
                         </p>
                         <p className="mt-2 text-sm text-[#dff8e8]">
